@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	appName string
-	lang    string
+	appName  string
+	lang     string
+	provider string
 )
 
 var genCmd = &cobra.Command{
@@ -38,6 +39,7 @@ func init() {
 	rootCmd.AddCommand(genCmd)
 	genCmd.Flags().StringVarP(&appName, "name", "n", "myapp", "Name of the application")
 	genCmd.Flags().StringVarP(&lang, "lang", "l", "go", "Language of the application (go, node, python)")
+	genCmd.Flags().StringVarP(&provider, "provider", "p", "aws", "Cloud provider for infra generation (aws, gcp, azure)")
 }
 
 func generateDockerfile(name string) {
@@ -90,9 +92,15 @@ func generateInfra(name string) {
 		os.Exit(1)
 	}
 
-	infraDir := filepath.Join(cwd, "infra")
-	// Templates are in templates/terraform/aws/
-	// We will generate main.tf, variables.tf, and provider.tf
+	// Validate provider
+	validProviders := map[string]bool{"aws": true, "gcp": true, "azure": true}
+	if !validProviders[provider] {
+		fmt.Printf("Unsupported provider: %s. Supported providers: aws, gcp, azure\n", provider)
+		os.Exit(1)
+	}
+
+	infraDir := filepath.Join(cwd, "infra", provider)
+	templateDir := filepath.Join("templates", "terraform", provider)
 
 	files := []string{"main.tf", "variables.tf", "provider.tf"}
 	data := struct {
@@ -101,12 +109,10 @@ func generateInfra(name string) {
 		AppName: name,
 	}
 
-	fmt.Printf("Generating AWS infrastructure for %s in %s...\n", name, infraDir)
+	fmt.Printf("Generating %s infrastructure for %s in %s...\n", provider, name, infraDir)
 
 	for _, file := range files {
-		// Source template path
-		templatePath := filepath.Join("templates", "terraform", "aws", file+".tmpl")
-		// Destination file path
+		templatePath := filepath.Join(templateDir, file+".tmpl")
 		outputPath := filepath.Join(infraDir, file)
 
 		if err := renderer.RenderTemplate(templatePath, outputPath, data); err != nil {
@@ -116,5 +122,5 @@ func generateInfra(name string) {
 		fmt.Printf("Generated %s\n", file)
 	}
 
-	fmt.Println("Infrastructure generated successfully!")
+	fmt.Printf("Infrastructure for %s generated successfully in infra/%s/\n", provider, provider)
 }

@@ -40,6 +40,15 @@ var genCmd = &cobra.Command{
 		case "db":
 			db, _ := cmd.Flags().GetString("db")
 			generateDB(appName, db)
+		case "makefile":
+			generateMakefile(appName)
+		case "env":
+			dbFlag, _ := cmd.Flags().GetString("db")
+			providerFlag, _ := cmd.Flags().GetString("provider")
+			monitoringFlag, _ := cmd.Flags().GetString("monitoring")
+			generateEnv(appName, dbFlag, providerFlag, monitoringFlag)
+		case "helm":
+			generateHelm(appName)
 		default:
 			fmt.Printf("Unknown generation type: %s\n", genType)
 			os.Exit(1)
@@ -53,6 +62,7 @@ func init() {
 	genCmd.Flags().StringVarP(&lang, "lang", "l", "go", "Language of the application (go, node, python)")
 	genCmd.Flags().StringVarP(&provider, "provider", "p", "aws", "Cloud provider for infra generation (aws, gcp, azure)")
 	genCmd.Flags().String("db", "postgres", "Database type (postgres, mysql, mongo, redis)")
+	genCmd.Flags().String("monitoring", "none", "Monitoring stack (prometheus, none)")
 }
 
 func generateDockerfile(name string) {
@@ -207,4 +217,68 @@ func generateDB(name, db string) {
 		os.Exit(1)
 	}
 	fmt.Printf("Database (%s) docker-compose generated → docker-compose.%s.yml\n", db, db)
+}
+
+func generateMakefile(name string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+	data := struct{ AppName string }{AppName: name}
+	outPath := filepath.Join(cwd, "Makefile")
+	if err := renderer.RenderTemplate(filepath.Join("templates", "makefile", "Makefile.tmpl"), outPath, data); err != nil {
+		fmt.Printf("Error generating Makefile: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Makefile generated → Makefile\n")
+}
+
+func generateEnv(name, db, prov, monitoring string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+	data := struct {
+		AppName    string
+		DB         string
+		Provider   string
+		Monitoring string
+	}{AppName: name, DB: db, Provider: prov, Monitoring: monitoring}
+	outPath := filepath.Join(cwd, ".env.example")
+	if err := renderer.RenderTemplate(filepath.Join("templates", "env", "env.tmpl"), outPath, data); err != nil {
+		fmt.Printf("Error generating .env.example: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf(".env.example generated → .env.example\n")
+}
+
+func generateHelm(name string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+	chartsDir := filepath.Join(cwd, "charts", name)
+	tmplDir := filepath.Join(cwd, "charts", name, "templates")
+	data := struct{ AppName string }{AppName: name}
+
+	files := []struct{ tmpl, out string }{
+		{filepath.Join("templates", "helm", "Chart.yaml.tmpl"), filepath.Join(chartsDir, "Chart.yaml")},
+		{filepath.Join("templates", "helm", "values.yaml.tmpl"), filepath.Join(chartsDir, "values.yaml")},
+		{filepath.Join("templates", "helm", "templates", "deployment.yaml.tmpl"), filepath.Join(tmplDir, "deployment.yaml")},
+		{filepath.Join("templates", "helm", "templates", "service.yaml.tmpl"), filepath.Join(tmplDir, "service.yaml")},
+		{filepath.Join("templates", "helm", "templates", "ingress.yaml.tmpl"), filepath.Join(tmplDir, "ingress.yaml")},
+	}
+	allOK := true
+	for _, f := range files {
+		if err := renderer.RenderTemplate(f.tmpl, f.out, data); err != nil {
+			fmt.Printf("Error generating %s: %v\n", f.out, err)
+			allOK = false
+		}
+	}
+	if allOK {
+		fmt.Printf("Helm chart generated → charts/%s/\n", name)
+	}
 }

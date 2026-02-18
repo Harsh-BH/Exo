@@ -37,12 +37,10 @@ var (
 	progressEmptyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("237"))
 
 	logoStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("86")).
-			Bold(true).
-			MarginBottom(1)
+			Bold(true)
 )
 
-const asciiLogo = `
+const AsciiLogo = `
   ███████╗██╗  ██╗ ██████╗ 
   ██╔════╝╚██╗██╔╝██╔═══██╗
   █████╗   ╚███╔╝ ██║   ██║
@@ -50,6 +48,19 @@ const asciiLogo = `
   ███████╗██╔╝ ██╗╚██████╔╝
   ╚══════╝╚═╝  ╚═╝ ╚═════╝ 
 `
+
+// GetLogo returns the styled ASCII logo with a colorful gradient.
+func GetLogo() string {
+	lines := strings.Split(strings.TrimSpace(AsciiLogo), "\n")
+	var styled strings.Builder
+	// Vibrant gradient colors (cyan to magenta)
+	colors := []string{"#00f5d4", "#00bbf9", "#9b5de5", "#f15bb5", "#fee440", "#ff9f1c"}
+	for i, line := range lines {
+		style := lipgloss.NewStyle().Foreground(lipgloss.Color(colors[i%len(colors)])).Bold(true)
+		styled.WriteString(style.Render(line) + "\n")
+	}
+	return styled.String()
+}
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -236,7 +247,7 @@ func (m model) View() string {
 	var b strings.Builder
 
 	// Logo (#12)
-	b.WriteString(logoStyle.Render(asciiLogo) + "\n")
+	b.WriteString(GetLogo() + "\n")
 
 	// Header with progress bar
 	b.WriteString(titleStyle.Render("EXO Setup Wizard") + "\n")

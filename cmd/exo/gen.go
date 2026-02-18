@@ -49,6 +49,13 @@ var genCmd = &cobra.Command{
 			generateEnv(appName, dbFlag, providerFlag, monitoringFlag)
 		case "helm":
 			generateHelm(appName)
+		case "gitignore":
+			db, _ := cmd.Flags().GetString("db")
+			generateGitignore(appName, lang, db)
+		case "grafana":
+			generateGrafana(appName)
+		case "alerts":
+			generateAlerts(appName)
 		default:
 			fmt.Printf("Unknown generation type: %s\n", genType)
 			os.Exit(1)
@@ -281,4 +288,56 @@ func generateHelm(name string) {
 	if allOK {
 		fmt.Printf("Helm chart generated → charts/%s/\n", name)
 	}
+}
+
+func generateGitignore(name, language, db string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+	data := struct {
+		AppName  string
+		Language string
+		DB       string
+	}{AppName: name, Language: language, DB: db}
+
+	outPath := filepath.Join(cwd, ".gitignore")
+	if err := renderer.RenderTemplate(filepath.Join("templates", "gitignore", "gitignore.tmpl"), outPath, data); err != nil {
+		fmt.Printf("Error generating .gitignore: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf(".gitignore generated → .gitignore\n")
+}
+
+func generateGrafana(name string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+	data := struct{ AppName string }{AppName: name}
+
+	outPath := filepath.Join(cwd, "grafana_dashboard.json")
+	if err := renderer.RenderTemplate(filepath.Join("templates", "grafana", "dashboard.json.tmpl"), outPath, data); err != nil {
+		fmt.Printf("Error generating Grafana dashboard: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Grafana dashboard generated → grafana_dashboard.json\n")
+}
+
+func generateAlerts(name string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+	data := struct{ AppName string }{AppName: name}
+
+	outPath := filepath.Join(cwd, "alerts.yml")
+	if err := renderer.RenderTemplate(filepath.Join("templates", "alerts", "alerts.yml.tmpl"), outPath, data); err != nil {
+		fmt.Printf("Error generating alerts: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Prometheus alerts generated → alerts.yml\n")
 }

@@ -1,0 +1,18 @@
+stages:
+  - build
+  - test
+
+variables:
+  GO_VERSION: "1.21"
+
+build:
+  stage: build
+  image: golang:${GO_VERSION}-alpine
+  script:
+    - go build -v ./...
+
+test:
+  stage: test
+  image: golang:${GO_VERSION}-alpine
+  script:
+    - go test -v ./...

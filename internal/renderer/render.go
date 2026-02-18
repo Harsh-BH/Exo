@@ -2,18 +2,33 @@ package renderer
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
+
+	exotemplates "github.com/Harsh-BH/Exo/templates"
 )
 
-// RenderTemplate renders a template file to a specific output path.
-// It ensures the output directory exists.
+// RenderTemplate renders a template to outputPath.
+// It first tries to read from the embedded FS; if not found it falls back to disk.
+// templatePath should use forward slashes (e.g. "docker/dockerfile.tmpl").
 func RenderTemplate(templatePath string, outputPath string, data interface{}) error {
-	// Read the template file
-	tmplContent, err := os.ReadFile(templatePath)
+	// Normalise to forward slashes for embed.FS compatibility
+	normalised := filepath.ToSlash(templatePath)
+
+	// embed.FS paths are relative to the templates/ dir, so strip the prefix
+	embedPath := strings.TrimPrefix(normalised, "templates/")
+
+	// Try embedded FS first
+	tmplContent, err := fs.ReadFile(exotemplates.FS, embedPath)
 	if err != nil {
-		return fmt.Errorf("failed to read template %s: %w", templatePath, err)
+		// Fallback: read from disk (useful during development / go run)
+		tmplContent, err = os.ReadFile(templatePath)
+		if err != nil {
+			return fmt.Errorf("failed to read template %s: %w", templatePath, err)
+		}
 	}
 
 	// Parse the template

@@ -1,4 +1,4 @@
-package goscaffold
+package exo
 
 import (
 	"fmt"

@@ -1,6 +1,6 @@
 package main
 
-import "github.com/Harsh-BH/Exo/cmd/goscaffold"
+import "github.com/Harsh-BH/Exo/cmd/exo"
 
 func main() {
 	goscaffold.Execute()

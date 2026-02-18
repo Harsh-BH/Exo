@@ -24,10 +24,16 @@ func RenderTemplate(templatePath string, outputPath string, data interface{}) er
 	// Try embedded FS first
 	tmplContent, err := fs.ReadFile(exotemplates.FS, embedPath)
 	if err != nil {
-		// Fallback: read from disk (useful during development / go run)
+		// Fallback 1: read from disk (useful during development / go run)
 		tmplContent, err = os.ReadFile(templatePath)
 		if err != nil {
-			return fmt.Errorf("failed to read template %s: %w", templatePath, err)
+			// Fallback 2: check ~/.exo/templates/ for remote registry templates
+			home, _ := os.UserHomeDir()
+			remotePath := filepath.Join(home, ".exo", "templates", embedPath)
+			tmplContent, err = os.ReadFile(remotePath)
+			if err != nil {
+				return fmt.Errorf("failed to read template %s: %w", templatePath, err)
+			}
 		}
 	}
 

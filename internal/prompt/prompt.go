@@ -35,7 +35,21 @@ var (
 
 	progressFilledStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	progressEmptyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("237"))
+
+	logoStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("86")).
+			Bold(true).
+			MarginBottom(1)
 )
+
+const asciiLogo = `
+  ███████╗██╗  ██╗ ██████╗ 
+  ██╔════╝╚██╗██╔╝██╔═══██╗
+  █████╗   ╚███╔╝ ██║   ██║
+  ██╔══╝   ██╔██╗ ██║   ██║
+  ███████╗██╔╝ ██╗╚██████╔╝
+  ╚══════╝╚═╝  ╚═╝ ╚═════╝ 
+`
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -220,6 +234,9 @@ func (m model) advance() (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	var b strings.Builder
+
+	// Logo (#12)
+	b.WriteString(logoStyle.Render(asciiLogo) + "\n")
 
 	// Header with progress bar
 	b.WriteString(titleStyle.Render("EXO Setup Wizard") + "\n")

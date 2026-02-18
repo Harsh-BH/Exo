@@ -17,24 +17,24 @@ Example: `exo init` → Detects Stack → Generates DevOps Assets → Ready to D
 
 ---
 
-## 🚀 Why EXO?
+## Why EXO?
 
 Starting a new microservice usually means copy-pasting Dockerfiles, wrestling with Kubernetes YAML, and debugging CI/CD pipelines. **EXO** automates this zero-to-one phase.
 
 It analyzes your source code and generates **production-ready** infrastructure code in seconds.
 
-## ✨ Features
+## Features
 
 | Feature | Description |
 | :--- | :--- |
-| **🧠 Smart Detection** | Automatically identifies Go, Node.js, and Python projects. |
-| **🐳 Containerization** | Generates optimized, multi-stage `Dockerfiles`. |
-| **☁️ Infrastructure** | Creates Terraform modules for AWS (VPC, EKS). |
-| **🔄 CI/CD** | Sets up GitHub Actions workflows for build and test. |
-| **🖥️ Interactive UI** | Beautiful terminal UI for easy configuration. |
-| **📦 Cross-Platform** | Binaries for Linux, macOS, and Windows. |
+| **Smart Detection** | Automatically identifies Go, Node.js, and Python projects. |
+| **Containerization** | Generates optimized, multi-stage `Dockerfiles`. |
+| **Infrastructure** | Creates Terraform modules for AWS (VPC, EKS). |
+| **CI/CD** | Sets up GitHub Actions workflows for build and test. |
+| **Interactive UI** | Beautiful terminal UI for easy configuration. |
+| **Cross-Platform** | Binaries for Linux, macOS, and Windows. |
 
-## 📦 Installation
+## Installation
 
 Download the latest release from the [Releases](https://github.com/Harsh-BH/Exo/releases) page or build from source:
 
@@ -51,7 +51,7 @@ The binary will be available in `bin/` (e.g., `bin/exo-linux-amd64`).
 curl -sL https://get.exo.sh | bash
 ```
 
-## ⚡ Quick Start
+## Quick Start
 
 1.  **Navigate to your project folder:**
     ```bash
@@ -76,14 +76,14 @@ curl -sL https://get.exo.sh | bash
     exo gen infra
     ```
 
-## 🛠️ Commands
+## Commands
 
 - `exo init`: Interactive setup wizard.
 - `exo gen docker [--lang=go|node|python]`: Generate Dockerfile.
 - `exo gen infra`: Generate Terraform for AWS.
 - `exo gen ci`: Generate GitHub Actions workflow.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
@@ -93,12 +93,12 @@ Contributions are what make the open-source community such an amazing place to l
 4.  Push to the Branch (`git push origin feature/AmazingFeature`)
 5.  Open a Pull Request
 
-## 📜 License
+## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
 <div align="center">
-  <sub>Built with ❤️ by Harsh-BH using Cobra & Bubble Tea.</sub>
+  <sub>Built with Love by Harsh-BH using Cobra & Bubble Tea.</sub>
 </div>

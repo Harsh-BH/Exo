@@ -5,10 +5,20 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Harsh-BH/Exo/internal/config"
 	"github.com/Harsh-BH/Exo/internal/prompt"
 	"github.com/Harsh-BH/Exo/internal/renderer"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
+
+var (
+	okStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("82")).Bold(true)
+	errStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
+)
+
+func printOK(msg string)  { fmt.Printf("  %s  %s\n", okStyle.Render("✓"), msg) }
+func printErr(msg string) { fmt.Printf("  %s  %s\n", errStyle.Render("✗"), msg) }
 
 var initCmd = &cobra.Command{
 	Use:   "init",
@@ -44,9 +54,9 @@ var initCmd = &cobra.Command{
 			tmplPath := filepath.Join("templates", "docker", tmplFile)
 			outPath := filepath.Join(cwd, "Dockerfile")
 			if err := renderer.RenderTemplate(tmplPath, outPath, data); err != nil {
-				fmt.Printf("  [!] Dockerfile: %v\n", err)
+				printErr(fmt.Sprintf("Dockerfile: %v", err))
 			} else {
-				fmt.Printf("  [+] Dockerfile (%s)\n", projectData.Language)
+				printOK(fmt.Sprintf("Dockerfile (%s)", projectData.Language))
 			}
 		}
 
@@ -54,16 +64,20 @@ var initCmd = &cobra.Command{
 		if projectData.Provider != "none" {
 			infraDir := filepath.Join(cwd, "infra", projectData.Provider)
 			tmplDir := filepath.Join("templates", "terraform", projectData.Provider)
+			allOK := true
 			for _, f := range []string{"main.tf", "variables.tf", "provider.tf"} {
 				if err := renderer.RenderTemplate(
 					filepath.Join(tmplDir, f+".tmpl"),
 					filepath.Join(infraDir, f),
 					data,
 				); err != nil {
-					fmt.Printf("  [!] infra/%s/%s: %v\n", projectData.Provider, f, err)
+					printErr(fmt.Sprintf("infra/%s/%s: %v", projectData.Provider, f, err))
+					allOK = false
 				}
 			}
-			fmt.Printf("  [+] Terraform (%s) → infra/%s/\n", projectData.Provider, projectData.Provider)
+			if allOK {
+				printOK(fmt.Sprintf("Terraform (%s) → infra/%s/", projectData.Provider, projectData.Provider))
+			}
 		}
 
 		// ── 3. CI/CD ───────────────────────────────────────────────────────────
@@ -75,9 +89,9 @@ var initCmd = &cobra.Command{
 				filepath.Join(ciDir, "go.yml"),
 				data,
 			); err != nil {
-				fmt.Printf("  [!] GitHub Actions: %v\n", err)
+				printErr(fmt.Sprintf("GitHub Actions: %v", err))
 			} else {
-				fmt.Println("  [+] GitHub Actions → .github/workflows/go.yml")
+				printOK("GitHub Actions → .github/workflows/go.yml")
 			}
 		case "gitlab-ci":
 			if err := renderer.RenderTemplate(
@@ -85,9 +99,9 @@ var initCmd = &cobra.Command{
 				filepath.Join(cwd, ".gitlab-ci.yml"),
 				data,
 			); err != nil {
-				fmt.Printf("  [!] GitLab CI: %v\n", err)
+				printErr(fmt.Sprintf("GitLab CI: %v", err))
 			} else {
-				fmt.Println("  [+] GitLab CI → .gitlab-ci.yml")
+				printOK("GitLab CI → .gitlab-ci.yml")
 			}
 		}
 
@@ -98,15 +112,33 @@ var initCmd = &cobra.Command{
 				"prometheus.yml":                filepath.Join("templates", "monitoring", "prometheus.tmpl"),
 				"docker-compose.monitoring.yml": filepath.Join("templates", "monitoring", "docker-compose.monitoring.tmpl"),
 			}
+			allOK := true
 			for outFile, tmplPath := range files {
 				if err := renderer.RenderTemplate(tmplPath, filepath.Join(monDir, outFile), data); err != nil {
-					fmt.Printf("  [!] monitoring/%s: %v\n", outFile, err)
+					printErr(fmt.Sprintf("monitoring/%s: %v", outFile, err))
+					allOK = false
 				}
 			}
-			fmt.Println("  [+] Prometheus + Grafana → monitoring/")
+			if allOK {
+				printOK("Prometheus + Grafana → monitoring/")
+			}
 		}
 
-		fmt.Printf("\nAll done! Your project '%s' is ready.\n", projectData.Name)
+		// ── 5. Save config ─────────────────────────────────────────────────────
+		cfg := &config.ExoConfig{
+			Name:       projectData.Name,
+			Language:   projectData.Language,
+			Provider:   projectData.Provider,
+			CI:         projectData.CI,
+			Monitoring: projectData.Monitoring,
+		}
+		if err := config.Save(cwd, cfg); err != nil {
+			printErr(fmt.Sprintf(".exo.yaml: %v", err))
+		} else {
+			printOK(".exo.yaml saved")
+		}
+
+		fmt.Printf("\nAll done! Your project '%s' is ready. Run 'exo status' to see what was generated.\n", projectData.Name)
 	},
 }
 

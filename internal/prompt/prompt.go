@@ -10,6 +10,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -30,7 +32,12 @@ var (
 	summaryKeyStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("205"))
+
+	progressFilledStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	progressEmptyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("237"))
 )
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
 // ProjectData holds all configuration collected from the wizard.
 type ProjectData struct {
@@ -41,6 +48,8 @@ type ProjectData struct {
 	Monitoring string
 }
 
+// ─── List Item ────────────────────────────────────────────────────────────────
+
 type item struct {
 	title, desc string
 }
@@ -48,6 +57,8 @@ type item struct {
 func (i item) Title() string       { return i.title }
 func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
+
+// ─── Steps ────────────────────────────────────────────────────────────────────
 
 const (
 	stepName = iota
@@ -58,6 +69,10 @@ const (
 	stepConfirm
 	stepDone
 )
+
+const totalSteps = stepDone // 6
+
+// ─── Model ────────────────────────────────────────────────────────────────────
 
 type model struct {
 	step      int
@@ -77,7 +92,7 @@ func newList(title string, items []list.Item) list.Model {
 		Foreground(lipgloss.Color("243")).
 		BorderLeftForeground(lipgloss.Color("86"))
 
-	l := list.New(items, delegate, 40, 10)
+	l := list.New(items, delegate, 44, 10)
 	l.Title = title
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
@@ -120,9 +135,23 @@ func initialModel() model {
 	}
 }
 
+// ─── Progress Bar ─────────────────────────────────────────────────────────────
+
+func progressBar(current, total int) string {
+	filled := current
+	empty := total - current
+	bar := progressFilledStyle.Render(strings.Repeat("█", filled))
+	bar += progressEmptyStyle.Render(strings.Repeat("░", empty))
+	return fmt.Sprintf("[%s] %d/%d", bar, current, total)
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
 func (m model) Init() tea.Cmd {
 	return textinput.Blink
 }
+
+// ─── Update ───────────────────────────────────────────────────────────────────
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -187,10 +216,14 @@ func (m model) advance() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// ─── View ─────────────────────────────────────────────────────────────────────
+
 func (m model) View() string {
 	var b strings.Builder
+
+	// Header with progress bar
 	b.WriteString(titleStyle.Render("EXO Setup Wizard") + "\n")
-	b.WriteString(stepStyle.Render(fmt.Sprintf("Step %d of %d", m.step+1, stepDone)) + "\n\n")
+	b.WriteString(progressBar(m.step, totalSteps) + "\n\n")
 
 	switch m.step {
 	case stepName:
@@ -200,23 +233,32 @@ func (m model) View() string {
 		listIdx := m.step - stepLanguage
 		b.WriteString(m.lists[listIdx].View() + "\n")
 	case stepConfirm:
-		b.WriteString(titleStyle.Render("Summary") + "\n\n")
-		b.WriteString(summaryKeyStyle.Render("Project:    ") + m.data.Name + "\n")
-		b.WriteString(summaryKeyStyle.Render("Language:   ") + m.data.Language + "\n")
-		b.WriteString(summaryKeyStyle.Render("Provider:   ") + m.data.Provider + "\n")
-		b.WriteString(summaryKeyStyle.Render("CI/CD:      ") + m.data.CI + "\n")
-		b.WriteString(summaryKeyStyle.Render("Monitoring: ") + m.data.Monitoring + "\n\n")
-		b.WriteString(highlightStyle.Render("Press Enter to generate all assets, Esc to go back.") + "\n")
+		b.WriteString(titleStyle.Render("Summary — Review your choices") + "\n\n")
+		b.WriteString(summaryKeyStyle.Render("  Project:    ") + m.data.Name + "\n")
+		b.WriteString(summaryKeyStyle.Render("  Language:   ") + m.data.Language + "\n")
+		b.WriteString(summaryKeyStyle.Render("  Provider:   ") + m.data.Provider + "\n")
+		b.WriteString(summaryKeyStyle.Render("  CI/CD:      ") + m.data.CI + "\n")
+		b.WriteString(summaryKeyStyle.Render("  Monitoring: ") + m.data.Monitoring + "\n\n")
+		b.WriteString(highlightStyle.Render("Press Enter to generate all assets.") + "\n")
 	}
 
 	if m.errMsg != "" {
-		b.WriteString("\n" + errorStyle.Render("x "+m.errMsg) + "\n")
+		b.WriteString("\n" + errorStyle.Render("✗ "+m.errMsg) + "\n")
 	}
-	if m.step != stepConfirm {
-		b.WriteString(stepStyle.Render("\nEnter to continue  |  Esc to go back  |  Ctrl+C to quit") + "\n")
+
+	// Navigation hints (#3)
+	if m.step == stepName {
+		b.WriteString(stepStyle.Render("\n↵ Enter to continue  •  Ctrl+C to quit") + "\n")
+	} else if m.step != stepConfirm {
+		b.WriteString(stepStyle.Render("\n↵ Enter to continue  •  Esc to go back  •  Ctrl+C to quit") + "\n")
+	} else {
+		b.WriteString(stepStyle.Render("\n↵ Enter to confirm  •  Esc to go back  •  Ctrl+C to quit") + "\n")
 	}
+
 	return b.String()
 }
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 // Run starts the interactive wizard and returns the collected project data.
 func Run() (*ProjectData, error) {

@@ -28,6 +28,10 @@ var genCmd = &cobra.Command{
 			generateDockerfile(appName)
 		case "infra":
 			generateInfra(appName)
+		case "k8s":
+			generateK8s(appName)
+		case "ci":
+			generateCI()
 		default:
 			fmt.Printf("Unknown generation type: %s\n", genType)
 			os.Exit(1)
@@ -123,4 +127,47 @@ func generateInfra(name string) {
 	}
 
 	fmt.Printf("Infrastructure for %s generated successfully in infra/%s/\n", provider, provider)
+}
+
+func generateK8s(name string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	k8sDir := filepath.Join(cwd, "k8s")
+	files := []string{"deployment.yaml", "service.yaml", "ingress.yaml"}
+	data := struct{ AppName string }{AppName: name}
+
+	fmt.Printf("Generating Kubernetes manifests for %s...\n", name)
+	for _, file := range files {
+		tmplPath := filepath.Join("templates", "k8s", file+".tmpl")
+		outPath := filepath.Join(k8sDir, file)
+		if err := renderer.RenderTemplate(tmplPath, outPath, data); err != nil {
+			fmt.Printf("Error rendering %s: %v\n", file, err)
+			os.Exit(1)
+		}
+		fmt.Printf("Generated k8s/%s\n", file)
+	}
+	fmt.Println("Kubernetes manifests generated successfully in k8s/")
+}
+
+func generateCI() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	ciDir := filepath.Join(cwd, ".github", "workflows")
+	templatePath := filepath.Join("templates", "ci", "github-actions.tmpl")
+	outputPath := filepath.Join(ciDir, "go.yml")
+
+	fmt.Println("Generating GitHub Actions workflow...")
+	if err := renderer.RenderTemplate(templatePath, outputPath, nil); err != nil {
+		fmt.Printf("Error rendering template: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("CI pipeline generated successfully at .github/workflows/go.yml")
 }

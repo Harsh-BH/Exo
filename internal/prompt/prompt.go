@@ -119,10 +119,10 @@ func newList(title string, items []list.Item) list.Model {
 		Foreground(lipgloss.Color("243")).
 		BorderLeftForeground(lipgloss.Color("86"))
 
-	l := list.New(items, delegate, 44, 10)
+	l := list.New(items, delegate, 44, 12)
 	l.Title = title
-	l.SetShowStatusBar(false)
-	l.SetFilteringEnabled(false)
+	l.SetShowStatusBar(true)
+	l.SetFilteringEnabled(true)
 	l.Styles.Title = titleStyle
 	return l
 }

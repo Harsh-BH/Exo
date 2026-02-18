@@ -186,6 +186,7 @@ var initCmd = &cobra.Command{
 		}
 
 		fmt.Printf("\nAll done! Your project '%s' is ready. Run 'exo status' to see what was generated.\n", projectData.Name)
+		RecordHistory("exo init", projectData.Name, fmt.Sprintf("lang=%s provider=%s ci=%s", projectData.Language, projectData.Provider, projectData.CI))
 	},
 }
 

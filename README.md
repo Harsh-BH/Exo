@@ -9,7 +9,6 @@
  ╚══════╝╚═╝  ╚═╝ ╚═════╝
 </pre>
 
-# EXO
 ### The Cloud-Native Bootstrap CLI
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/Harsh-BH/Exo)](https://goreportcard.com/report/github.com/Harsh-BH/Exo)

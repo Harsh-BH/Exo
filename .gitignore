@@ -75,3 +75,8 @@ charts/*/tmpcharts/
 *.temp
 tmp/
 temp/
+
+# ── Docs (Next.js) ────────────────────────────────────────────────────────────
+docs/node_modules/
+docs/.next/
+docs/out/

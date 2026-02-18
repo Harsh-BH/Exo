@@ -11,6 +11,7 @@ import (
 
 var (
 	appName string
+	lang    string
 )
 
 var genCmd = &cobra.Command{
@@ -36,6 +37,7 @@ var genCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(genCmd)
 	genCmd.Flags().StringVarP(&appName, "name", "n", "myapp", "Name of the application")
+	genCmd.Flags().StringVarP(&lang, "lang", "l", "go", "Language of the application (go, node, python)")
 }
 
 func generateDockerfile(name string) {
@@ -51,7 +53,20 @@ func generateDockerfile(name string) {
 	// or we can find the template relative to the source.
 	// In a real CLI, we would embed templates using //go:embed.
 	// Let's assume the user is running 'go run main.go' from the project root.
-	templatePath := filepath.Join("templates", "docker", "dockerfile.tmpl")
+	var templateFile string
+	switch lang {
+	case "node":
+		templateFile = "node.tmpl"
+	case "python":
+		templateFile = "python.tmpl"
+	case "go":
+		templateFile = "dockerfile.tmpl"
+	default:
+		fmt.Printf("Unsupported language: %s. Defaulting to Go.\n", lang)
+		templateFile = "dockerfile.tmpl"
+	}
+
+	templatePath := filepath.Join("templates", "docker", templateFile)
 	outputPath := filepath.Join(cwd, "Dockerfile")
 
 	data := struct {

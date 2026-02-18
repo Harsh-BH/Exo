@@ -31,11 +31,40 @@ var initCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Run the interactive wizard
-		projectData, err := prompt.Run()
-		if err != nil {
-			fmt.Printf("\n%v\n", err)
-			os.Exit(0)
+		// Check for non-interactive mode
+		nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
+
+		var projectData *prompt.ProjectData
+
+		if nonInteractive {
+			// Read all flags directly
+			name, _ := cmd.Flags().GetString("name")
+			if name == "" {
+				fmt.Println("Error: --name is required in non-interactive mode")
+				os.Exit(1)
+			}
+			langFlag, _ := cmd.Flags().GetString("lang")
+			providerFlag, _ := cmd.Flags().GetString("provider")
+			ciFlag, _ := cmd.Flags().GetString("ci")
+			monitoringFlag, _ := cmd.Flags().GetString("monitoring")
+			dbFlag, _ := cmd.Flags().GetString("db")
+			projectData = &prompt.ProjectData{
+				Name:       name,
+				Language:   langFlag,
+				Provider:   providerFlag,
+				CI:         ciFlag,
+				Monitoring: monitoringFlag,
+				DB:         dbFlag,
+			}
+			fmt.Printf("Running in non-interactive mode for project '%s'...\n", name)
+		} else {
+			// Run the interactive wizard
+			var err error
+			projectData, err = prompt.Run()
+			if err != nil {
+				fmt.Printf("\n%v\n", err)
+				os.Exit(0)
+			}
 		}
 
 		fmt.Printf("\nGenerating assets for '%s'...\n\n", projectData.Name)
@@ -162,4 +191,11 @@ var initCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(initCmd)
+	initCmd.Flags().Bool("non-interactive", false, "Skip wizard and use flags directly (for CI/CD)")
+	initCmd.Flags().String("name", "", "Project name (required in non-interactive mode)")
+	initCmd.Flags().String("lang", "go", "Language (go, node, python)")
+	initCmd.Flags().String("provider", "none", "Cloud provider (aws, gcp, azure, none)")
+	initCmd.Flags().String("ci", "none", "CI/CD tool (github-actions, gitlab-ci, none)")
+	initCmd.Flags().String("monitoring", "none", "Monitoring stack (prometheus, none)")
+	initCmd.Flags().String("db", "none", "Database (postgres, mysql, mongo, redis, none)")
 }

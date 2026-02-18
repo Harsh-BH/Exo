@@ -7,5 +7,5 @@ import "embed"
 
 // FS is the embedded filesystem containing all templates.
 //
-//go:embed docker/* k8s/* ci/* monitoring/* terraform/aws/* terraform/gcp/* terraform/azure/*
+//go:embed docker/* k8s/* ci/* monitoring/* terraform/aws/* terraform/gcp/* terraform/azure/* db/*
 var FS embed.FS

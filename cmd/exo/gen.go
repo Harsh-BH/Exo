@@ -37,6 +37,9 @@ var genCmd = &cobra.Command{
 			generateK8s(appName)
 		case "ci":
 			generateCI()
+		case "db":
+			db, _ := cmd.Flags().GetString("db")
+			generateDB(appName, db)
 		default:
 			fmt.Printf("Unknown generation type: %s\n", genType)
 			os.Exit(1)
@@ -49,6 +52,7 @@ func init() {
 	genCmd.Flags().StringVarP(&appName, "name", "n", "myapp", "Name of the application")
 	genCmd.Flags().StringVarP(&lang, "lang", "l", "go", "Language of the application (go, node, python)")
 	genCmd.Flags().StringVarP(&provider, "provider", "p", "aws", "Cloud provider for infra generation (aws, gcp, azure)")
+	genCmd.Flags().String("db", "postgres", "Database type (postgres, mysql, mongo, redis)")
 }
 
 func generateDockerfile(name string) {
@@ -175,4 +179,32 @@ func generateCI() {
 		os.Exit(1)
 	}
 	fmt.Println("CI pipeline generated successfully at .github/workflows/go.yml")
+}
+
+func generateDB(name, db string) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	tmplMap := map[string]string{
+		"postgres": "postgres.tmpl",
+		"mysql":    "mysql.tmpl",
+		"mongo":    "mongo.tmpl",
+		"redis":    "redis.tmpl",
+	}
+	tmplFile, ok := tmplMap[db]
+	if !ok {
+		fmt.Printf("Unknown database: %s (use postgres, mysql, mongo, redis)\n", db)
+		os.Exit(1)
+	}
+
+	data := struct{ AppName string }{AppName: name}
+	outPath := filepath.Join(cwd, fmt.Sprintf("docker-compose.%s.yml", db))
+	if err := renderer.RenderTemplate(filepath.Join("templates", "db", tmplFile), outPath, data); err != nil {
+		fmt.Printf("Error generating DB compose: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Database (%s) docker-compose generated → docker-compose.%s.yml\n", db, db)
 }

@@ -124,7 +124,25 @@ var initCmd = &cobra.Command{
 			}
 		}
 
-		// ── 5. Save config ─────────────────────────────────────────────────────
+		// ── 5. Database ────────────────────────────────────────────────────────
+		if projectData.DB != "" && projectData.DB != "none" {
+			dbTmplMap := map[string]string{
+				"postgres": "postgres.tmpl",
+				"mysql":    "mysql.tmpl",
+				"mongo":    "mongo.tmpl",
+				"redis":    "redis.tmpl",
+			}
+			if tmplFile, ok := dbTmplMap[projectData.DB]; ok {
+				outPath := filepath.Join(cwd, fmt.Sprintf("docker-compose.%s.yml", projectData.DB))
+				if err := renderer.RenderTemplate(filepath.Join("templates", "db", tmplFile), outPath, data); err != nil {
+					printErr(fmt.Sprintf("db: %v", err))
+				} else {
+					printOK(fmt.Sprintf("%s → docker-compose.%s.yml", projectData.DB, projectData.DB))
+				}
+			}
+		}
+
+		// ── 6. Save config ─────────────────────────────────────────────────────
 		cfg := &config.ExoConfig{
 			Name:       projectData.Name,
 			Language:   projectData.Language,

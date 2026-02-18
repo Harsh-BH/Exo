@@ -71,6 +71,7 @@ type ProjectData struct {
 	Provider   string
 	CI         string
 	Monitoring string
+	DB         string
 }
 
 // ─── List Item ────────────────────────────────────────────────────────────────
@@ -91,18 +92,19 @@ const (
 	stepProvider
 	stepCI
 	stepMonitoring
+	stepDB
 	stepConfirm
 	stepDone
 )
 
-const totalSteps = stepDone // 6
+const totalSteps = stepDone // 7
 
 // ─── Model ────────────────────────────────────────────────────────────────────
 
 type model struct {
 	step      int
 	nameInput textinput.Model
-	lists     [4]list.Model
+	lists     [5]list.Model
 	data      ProjectData
 	errMsg    string
 	confirmed bool
@@ -153,10 +155,18 @@ func initialModel() model {
 		item{"none", "Skip monitoring setup"},
 	})
 
+	dbList := newList("Select Database", []list.Item{
+		item{"postgres", "PostgreSQL (recommended)"},
+		item{"mysql", "MySQL"},
+		item{"mongo", "MongoDB"},
+		item{"redis", "Redis (cache/queue)"},
+		item{"none", "Skip database setup"},
+	})
+
 	return model{
 		step:      stepName,
 		nameInput: ti,
-		lists:     [4]list.Model{langList, providerList, ciList, monitoringList},
+		lists:     [5]list.Model{langList, providerList, ciList, monitoringList, dbList},
 	}
 }
 
@@ -199,7 +209,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if m.step == stepName {
 		m.nameInput, cmd = m.nameInput.Update(msg)
-	} else if m.step >= stepLanguage && m.step <= stepMonitoring {
+	} else if m.step >= stepLanguage && m.step <= stepDB {
 		listIdx := m.step - stepLanguage
 		m.lists[listIdx], cmd = m.lists[listIdx].Update(msg)
 	}
@@ -232,6 +242,10 @@ func (m model) advance() (tea.Model, tea.Cmd) {
 		if sel, ok := m.lists[3].SelectedItem().(item); ok {
 			m.data.Monitoring = sel.title
 		}
+	case stepDB:
+		if sel, ok := m.lists[4].SelectedItem().(item); ok {
+			m.data.DB = sel.title
+		}
 	case stepConfirm:
 		m.confirmed = true
 		m.step = stepDone
@@ -257,7 +271,7 @@ func (m model) View() string {
 	case stepName:
 		b.WriteString("What is the name of your project?\n\n")
 		b.WriteString(m.nameInput.View() + "\n")
-	case stepLanguage, stepProvider, stepCI, stepMonitoring:
+	case stepLanguage, stepProvider, stepCI, stepMonitoring, stepDB:
 		listIdx := m.step - stepLanguage
 		b.WriteString(m.lists[listIdx].View() + "\n")
 	case stepConfirm:
@@ -266,7 +280,8 @@ func (m model) View() string {
 		b.WriteString(summaryKeyStyle.Render("  Language:   ") + m.data.Language + "\n")
 		b.WriteString(summaryKeyStyle.Render("  Provider:   ") + m.data.Provider + "\n")
 		b.WriteString(summaryKeyStyle.Render("  CI/CD:      ") + m.data.CI + "\n")
-		b.WriteString(summaryKeyStyle.Render("  Monitoring: ") + m.data.Monitoring + "\n\n")
+		b.WriteString(summaryKeyStyle.Render("  Monitoring: ") + m.data.Monitoring + "\n")
+		b.WriteString(summaryKeyStyle.Render("  Database:   ") + m.data.DB + "\n\n")
 		b.WriteString(highlightStyle.Render("Press Enter to generate all assets.") + "\n")
 	}
 

@@ -1,18 +1,18 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: test-app-ingress
+  name: Exo-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
-    - host: test-app.example.com
+    - host: Exo.example.com
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: test-app-svc
+                name: Exo-svc
                 port:
                   number: 80

@@ -9,6 +9,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// renderFile is a shared helper that renders a template to an output path.
+func renderFile(tmplPath, outPath string, data interface{}) error {
+	return renderer.RenderTemplate(tmplPath, outPath, data)
+}
+
 var (
 	appName  string
 	lang     string

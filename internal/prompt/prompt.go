@@ -2,11 +2,8 @@ package prompt
 
 import (
     "fmt"
-    "os"
-
     "github.com/charmbracelet/bubbles/textinput"
     tea "github.com/charmbracelet/bubbletea"
-    "github.com/charmbracelet/lipgloss"
 )
 
 type ProjectData struct {

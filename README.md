@@ -9,104 +9,218 @@
  ╚══════╝╚═╝  ╚═╝ ╚═════╝
 </pre>
 
-### The Cloud-Native Bootstrap CLI
+### Cloud-Native Bootstrap CLI  
+**From Source Code → Production Infrastructure in Seconds**
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/Harsh-BH/Exo)](https://goreportcard.com/report/github.com/Harsh-BH/Exo)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Harsh-BH/Exo/go.yml?branch=main)](https://github.com/Harsh-BH/Exo/actions)
 
-<p align="center">
-  <img src="https://via.placeholder.com/800x400.png?text=EXO+CLI+Demo+GIF" alt="EXO Demo" width="800">
-</p>
-
-Example: `exo init` → Detects Stack → Generates DevOps Assets → Ready to Deploy.
-
 </div>
 
 ---
 
-## Why EXO?
+## $ whoami
 
-Starting a new microservice usually means copy-pasting Dockerfiles, wrestling with Kubernetes YAML, and debugging CI/CD pipelines. **EXO** automates this zero-to-one phase.
+**EXO** is a cloud-native bootstrap engine for modern microservices.
 
-It analyzes your source code and generates **production-ready** infrastructure code in seconds.
+It eliminates the repetitive DevOps overhead of:
+- Writing Dockerfiles  
+- Configuring CI/CD pipelines  
+- Crafting Terraform modules  
+- Setting up Kubernetes infrastructure  
 
-## Features
+You write application code.  
+EXO generates the production scaffolding.
 
-| Feature | Description |
-| :--- | :--- |
-| **Smart Detection** | Automatically identifies Go, Node.js, and Python projects. |
-| **Containerization** | Generates optimized, multi-stage `Dockerfiles`. |
-| **Infrastructure** | Creates Terraform modules for AWS (VPC, EKS). |
-| **CI/CD** | Sets up GitHub Actions workflows for build and test. |
-| **Interactive UI** | Beautiful terminal UI for easy configuration. |
-| **Cross-Platform** | Binaries for Linux, macOS, and Windows. |
+---
 
-## Installation
+## $ why exo
 
-Download the latest release from the [Releases](https://github.com/Harsh-BH/Exo/releases) page or build from source:
+Bootstrapping a service typically requires:
 
-### Build from Source
+```
+Dockerfile
+Kubernetes YAML
+Terraform modules
+CI workflows
+Environment configs
+Cloud wiring
+```
+
+Most of it is repetitive.  
+Most of it is error-prone.  
+
+**EXO compresses this zero-to-deployment lifecycle into a single CLI workflow.**
+
+---
+
+## $ capabilities
+
+| Module | What EXO Does |
+|--------|---------------|
+| Stack Detection | Automatically detects Go, Node.js, and Python projects |
+| Container Engine | Generates optimized multi-stage Dockerfiles |
+| Infrastructure | Provisions AWS-ready Terraform (VPC, EKS-ready structure) |
+| CI/CD | Generates GitHub Actions pipelines |
+| Interactive CLI | Guided configuration via terminal UI |
+| Cross Platform | Linux, macOS, Windows builds |
+
+---
+
+## $ architecture
+
+```
+┌──────────────────┐
+│   Source Code    │
+└─────────┬────────┘
+          │
+          ▼
+   Stack Detection Engine
+          │
+          ▼
+  Asset Generation Layer
+  ├── Dockerfile
+  ├── Terraform
+  ├── CI/CD
+  └── Config Templates
+          │
+          ▼
+   Production-Ready Repo
+```
+
+Design principles:
+- Idempotent generation
+- Minimal configuration
+- Cloud-native defaults
+- Extensible architecture
+
+---
+
+## $ install
+
+### Option 1 — Build from Source
+
 ```bash
 git clone https://github.com/Harsh-BH/Exo.git
 cd Exo
 ./scripts/build.sh
 ```
-The binary will be available in `bin/` (e.g., `bin/exo-linux-amd64`).
 
-### Quick Install (Planned)
+Binary will be available in:
+
+```
+bin/exo-<os>-<arch>
+```
+
+---
+
+### Option 2 — Quick Install (Planned)
+
 ```bash
 curl -sL https://get.exo.sh | bash
 ```
 
-## Quick Start
+---
 
-1.  **Navigate to your project folder:**
-    ```bash
-    cd ~/my-awesome-app
-    ```
+## $ quickstart
 
-2.  **Initialize EXO:**
-    ```bash
-    exo init
-    ```
-    *EXO will detect your language and ask you a few questions.*
+Navigate to your service:
 
-3.  **Generate Specific Assets:**
-    ```bash
-    # Generate a Dockerfile
-    exo gen docker
+```bash
+cd ~/my-service
+```
 
-    # Generate CI/CD Pipeline
-    exo gen ci
+Initialize EXO:
 
-    # Generate AWS Infrastructure
-    exo gen infra
-    ```
+```bash
+exo init
+```
 
-## Commands
+Generate components individually:
 
-- `exo init`: Interactive setup wizard.
-- `exo gen docker [--lang=go|node|python]`: Generate Dockerfile.
-- `exo gen infra`: Generate Terraform for AWS.
-- `exo gen ci`: Generate GitHub Actions workflow.
+```bash
+exo gen docker
+exo gen ci
+exo gen infra
+```
 
-## Contributing
+Workflow example:
 
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+```
+$ exo init
+> Detecting stack...
+> Found: Go
+> Generating Dockerfile...
+> Generating CI workflow...
+> Generating Terraform modules...
+> Setup complete.
+```
 
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'feat: add some amazing feature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+---
 
-## License
+## $ commands
 
-Distributed under the MIT License. See `LICENSE` for more information.
+| Command | Description |
+|----------|-------------|
+| `exo init` | Interactive setup wizard |
+| `exo gen docker` | Generate Dockerfile |
+| `exo gen infra` | Generate Terraform modules |
+| `exo gen ci` | Generate GitHub Actions workflow |
+
+---
+
+## $ project structure (generated)
+
+```
+.
+├── Dockerfile
+├── .github/workflows/
+│   └── ci.yml
+├── infra/
+│   ├── main.tf
+│   ├── variables.tf
+│   └── outputs.tf
+└── exo.config.yaml
+```
+
+---
+
+## $ roadmap
+
+- GCP and Azure support  
+- Helm chart generation  
+- Kubernetes YAML generation  
+- Multi-cloud templates  
+- Plugin system for custom stacks  
+- AI-assisted infrastructure recommendations  
+
+---
+
+## $ contributing
+
+```
+git fork
+git checkout -b feature/your-feature
+git commit -m "feat: add feature"
+git push
+```
+
+Open a Pull Request.
+
+EXO follows conventional commits and modular CLI architecture.
+
+---
+
+## $ license
+
+MIT License — see `LICENSE` for details.
 
 ---
 
 <div align="center">
-  <sub>Built with Love by Harsh-BH using Cobra & Bubble Tea.</sub>
+
+Built by Harsh-BH  
+Powered by Go, Cobra, and Bubble Tea  
+
 </div>

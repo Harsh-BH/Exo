@@ -2,7 +2,6 @@ package exo
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 
@@ -46,7 +45,7 @@ Available topics:
   gcp             Google Cloud docs
   azure           Azure docs`,
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		topic := ""
 		if len(args) > 0 {
 			topic = args[0]
@@ -54,8 +53,7 @@ Available topics:
 
 		url, ok := docsURLs[topic]
 		if !ok {
-			fmt.Printf("Unknown topic: %s\n\nAvailable topics: terraform, k8s, helm, docker, github-actions, gitlab-ci, prometheus, grafana, aws, gcp, azure\n", topic)
-			os.Exit(1)
+			return fmt.Errorf("unknown topic: %s\n\nAvailable topics: terraform, k8s, helm, docker, github-actions, gitlab-ci, prometheus, grafana, aws, gcp, azure", topic)
 		}
 
 		infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
@@ -64,6 +62,7 @@ Available topics:
 		if err := openBrowser(url); err != nil {
 			fmt.Printf("Could not open browser automatically.\nVisit: %s\n", url)
 		}
+		return nil
 	},
 }
 

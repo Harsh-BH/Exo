@@ -68,7 +68,9 @@ func TestAddDB(t *testing.T) {
 	cmd.Flags().String("db", "postgres", "")
 	cmd.Flags().Set("db", "postgres")
 
-	addDB(dir, "testapp", cmd)
+	if err := addDB(dir, "testapp", cmd); err != nil {
+		t.Fatalf("addDB error: %v", err)
+	}
 
 	outFile := filepath.Join(dir, "docker-compose.postgres.yml")
 	if _, err := os.Stat(outFile); err != nil {

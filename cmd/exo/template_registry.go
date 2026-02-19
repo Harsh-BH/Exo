@@ -65,43 +65,38 @@ var templateAddCmd = &cobra.Command{
 	Use:   "add <url>",
 	Short: "Install a remote template registry from a Git URL",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		url := args[0]
 		infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("82")).Bold(true)
-		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 
-		name := pluginNameFromURL(url) // reuse helper
+		name := pluginNameFromURL(url)
 		destDir := filepath.Join(exoTemplatesDir(), name)
 
 		if _, err := os.Stat(destDir); err == nil {
-			fmt.Printf("  %s  Registry '%s' already installed.\n", errStyle.Render("✗"), name)
-			os.Exit(1)
+			return fmt.Errorf("registry '%s' is already installed", name)
 		}
-
 		if !toolExists("git") {
-			fmt.Printf("  %s  git is required to install remote templates.\n", errStyle.Render("✗"))
-			os.Exit(1)
+			return fmt.Errorf("git is required to install remote templates")
 		}
 
 		fmt.Printf("%s Installing template registry '%s' from %s...\n", infoStyle.Render("→"), name, url)
 
 		if err := os.MkdirAll(exoTemplatesDir(), 0755); err != nil {
-			fmt.Printf("  %s  Failed to create templates dir: %v\n", errStyle.Render("✗"), err)
-			os.Exit(1)
+			return fmt.Errorf("creating templates dir: %w", err)
 		}
 
 		gitCmd := exec.Command("git", "clone", "--depth=1", url, destDir)
 		gitCmd.Stdout = os.Stdout
 		gitCmd.Stderr = os.Stderr
 		if err := gitCmd.Run(); err != nil {
-			fmt.Printf("  %s  Clone failed: %v\n", errStyle.Render("✗"), err)
-			os.Exit(1)
+			return fmt.Errorf("clone failed: %w", err)
 		}
 
 		count := countTemplates(destDir)
 		fmt.Printf("  %s  Registry '%s' installed (%d templates) → %s\n",
 			okStyle.Render("✓"), name, count, destDir)
+		return nil
 	},
 }
 
@@ -109,21 +104,19 @@ var templateRemoveCmd = &cobra.Command{
 	Use:   "remove <name>",
 	Short: "Remove an installed remote template registry",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("82")).Bold(true)
-		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 
 		destDir := filepath.Join(exoTemplatesDir(), name)
 		if _, err := os.Stat(destDir); err != nil {
-			fmt.Printf("  %s  Registry '%s' is not installed.\n", errStyle.Render("✗"), name)
-			os.Exit(1)
+			return fmt.Errorf("registry '%s' is not installed", name)
 		}
 		if err := os.RemoveAll(destDir); err != nil {
-			fmt.Printf("  %s  Failed to remove registry: %v\n", errStyle.Render("✗"), err)
-			os.Exit(1)
+			return fmt.Errorf("removing registry: %w", err)
 		}
 		fmt.Printf("  %s  Registry '%s' removed.\n", okStyle.Render("✓"), name)
+		return nil
 	},
 }
 

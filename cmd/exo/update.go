@@ -20,7 +20,7 @@ var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Check for and install the latest version of EXO",
 	Long:  `Checks the GitHub releases API for a newer version and updates the binary in-place.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		checkOnly, _ := cmd.Flags().GetBool("check")
 
 		upStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("82")).Bold(true)
@@ -31,35 +31,33 @@ var updateCmd = &cobra.Command{
 
 		latest, downloadURL, err := fetchLatestRelease()
 		if err != nil {
-			fmt.Printf("  ✗ Failed to check for updates: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("checking for updates: %w", err)
 		}
 
 		if latest == currentVersion {
 			fmt.Printf("  %s You are already on the latest version (%s)\n", upStyle.Render("✓"), currentVersion)
-			return
+			return nil
 		}
 
 		fmt.Printf("  %s New version available: %s → %s\n", infoStyle.Render("↑"), currentVersion, latest)
 
 		if checkOnly {
 			fmt.Printf("  %s Run 'exo update' (without --check) to install.\n", warnStyle.Render("ℹ"))
-			return
+			return nil
 		}
 
 		if downloadURL == "" {
-			fmt.Printf("  ✗ No binary found for %s/%s in release %s\n", runtime.GOOS, runtime.GOARCH, latest)
-			fmt.Printf("    Download manually: https://github.com/Harsh-BH/Exo/releases/tag/%s\n", latest)
-			os.Exit(1)
+			return fmt.Errorf("no binary found for %s/%s in release %s\n    Download manually: https://github.com/Harsh-BH/Exo/releases/tag/%s",
+				runtime.GOOS, runtime.GOARCH, latest, latest)
 		}
 
 		fmt.Printf("  → Downloading %s...\n", latest)
 		if err := downloadAndReplace(downloadURL); err != nil {
-			fmt.Printf("  ✗ Update failed: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("update failed: %w", err)
 		}
 
 		fmt.Printf("  %s Updated to %s successfully! Restart exo to use the new version.\n", upStyle.Render("✓"), latest)
+		return nil
 	},
 }
 

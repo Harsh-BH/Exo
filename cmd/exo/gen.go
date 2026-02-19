@@ -5,339 +5,183 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Harsh-BH/Exo/internal/config"
+	"github.com/Harsh-BH/Exo/internal/detector"
 	"github.com/Harsh-BH/Exo/internal/renderer"
 	"github.com/spf13/cobra"
 )
 
-// renderFile is a shared helper that renders a template to an output path.
-func renderFile(tmplPath, outPath string, data interface{}) error {
+// renderFile is a shared helper that renders a template to an output path,
+// honouring --dry-run and --force flags.
+func renderFile(tmplPath, outPath string, data interface{}, dryRun, force bool) error {
+	if dryRun {
+		fmt.Printf("  [dry-run] would write → %s\n", outPath)
+		return nil
+	}
+	if !force {
+		if _, err := os.Stat(outPath); err == nil {
+			fmt.Printf("  ⚠ %s already exists (use --force to overwrite)\n", filepath.Base(outPath))
+			return nil
+		}
+	}
 	return renderer.RenderTemplate(tmplPath, outPath, data)
 }
 
-var (
-	appName  string
-	lang     string
-	provider string
-)
+// loadTemplateData builds a TemplateData from flags, falling back to .exo.yaml,
+// then to the auto-detector.
+func loadTemplateData(cmd *cobra.Command, cwd string) config.TemplateData {
+	// Try loading persisted config first
+	var base config.TemplateData
+	if cfg, err := config.Load(cwd); err == nil {
+		base = cfg.ToTemplateData()
+	} else {
+		// Auto-detect language/framework if no config
+		if info, err := detector.Detect(cwd); err == nil {
+			base.Language = info.Language
+			base.Framework = info.Framework
+		}
+	}
+	if base.Port == 0 {
+		base.Port = 8080
+	}
+
+	// Flag overrides beat .exo.yaml
+	if cmd.Flags().Changed("name") {
+		v, _ := cmd.Flags().GetString("name")
+		base.AppName = v
+	}
+	if base.AppName == "" {
+		base.AppName = filepath.Base(cwd)
+	}
+	if cmd.Flags().Changed("lang") {
+		v, _ := cmd.Flags().GetString("lang")
+		base.Language = v
+	}
+	if cmd.Flags().Changed("provider") {
+		v, _ := cmd.Flags().GetString("provider")
+		base.Provider = v
+	}
+	if cmd.Flags().Changed("db") {
+		v, _ := cmd.Flags().GetString("db")
+		base.DB = v
+	}
+	if cmd.Flags().Changed("monitoring") {
+		v, _ := cmd.Flags().GetString("monitoring")
+		base.Monitoring = v
+	}
+	return base
+}
 
 var genCmd = &cobra.Command{
 	Use:   "gen [type]",
-	Short: "Generate a file (e.g., docker)",
-	Long:  `Generate a specific file type for your project. Currently supports: docker, infra.`,
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	Short: "Generate a DevOps asset",
+	Long: `Generate a specific DevOps asset for your project.
+
+Types:
+  docker          Dockerfile (language-aware)
+  infra           Terraform infrastructure
+  k8s             Kubernetes manifests
+  helm            Helm chart
+  ci              CI/CD pipeline
+  db              Database docker-compose
+  makefile        Makefile
+  env             .env.example
+  gitignore       .gitignore
+  grafana         Grafana dashboard JSON
+  alerts          Prometheus alert rules
+  docker-compose  Full docker-compose.yml (app + db + monitoring)
+  readme          README.md
+  pre-commit      .pre-commit-config.yaml
+  devcontainer    .devcontainer/devcontainer.json
+  renovate        renovate.json
+  license         LICENSE file
+  dependabot      .github/dependabot.yml
+  sonarqube       sonar-project.properties
+  sbom            Software Bill of Materials (CycloneDX JSON, uses syft if available)`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		genType := args[0]
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+
+		// --output-dir overrides the destination directory
+		if outDir, _ := cmd.Flags().GetString("output-dir"); outDir != "" {
+			if !filepath.IsAbs(outDir) {
+				outDir = filepath.Join(cwd, outDir)
+			}
+			if err := os.MkdirAll(outDir, 0o755); err != nil {
+				return fmt.Errorf("creating output dir: %w", err)
+			}
+			cwd = outDir
+		}
+
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		force, _ := cmd.Flags().GetBool("force")
+		data := loadTemplateData(cmd, cwd)
+
+		if dryRun {
+			fmt.Println("  [dry-run mode — no files will be written]")
+		}
 
 		switch genType {
 		case "docker":
-			generateDockerfile(appName)
+			return generateDockerfile(cwd, data, dryRun, force)
 		case "infra":
-			generateInfra(appName)
+			return generateInfra(cwd, data, dryRun, force)
 		case "k8s":
-			generateK8s(appName)
-		case "ci":
-			generateCI()
-		case "db":
-			db, _ := cmd.Flags().GetString("db")
-			generateDB(appName, db)
-		case "makefile":
-			generateMakefile(appName)
-		case "env":
-			dbFlag, _ := cmd.Flags().GetString("db")
-			providerFlag, _ := cmd.Flags().GetString("provider")
-			monitoringFlag, _ := cmd.Flags().GetString("monitoring")
-			generateEnv(appName, dbFlag, providerFlag, monitoringFlag)
+			return generateK8s(cwd, data, dryRun, force)
 		case "helm":
-			generateHelm(appName)
+			return generateHelm(cwd, data, dryRun, force)
+		case "ci":
+			return generateCI(cwd, data, dryRun, force)
+		case "db":
+			return generateDB(cwd, data, dryRun, force)
+		case "makefile":
+			return generateMakefile(cwd, data, dryRun, force)
+		case "env":
+			return generateEnv(cwd, data, dryRun, force)
 		case "gitignore":
-			db, _ := cmd.Flags().GetString("db")
-			generateGitignore(appName, lang, db)
+			return generateGitignore(cwd, data, dryRun, force)
 		case "grafana":
-			generateGrafana(appName)
+			return generateGrafana(cwd, data, dryRun, force)
 		case "alerts":
-			generateAlerts(appName)
+			return generateAlerts(cwd, data, dryRun, force)
+		case "docker-compose":
+			return generateDockerCompose(cwd, data, dryRun, force)
+		case "readme":
+			return generateReadme(cwd, data, dryRun, force)
+		case "pre-commit":
+			return generatePreCommit(cwd, data, dryRun, force)
+		case "devcontainer":
+			return generateDevcontainer(cwd, data, dryRun, force)
+		case "renovate":
+			return generateRenovate(cwd, data, dryRun, force)
+		case "license":
+			licenseType, _ := cmd.Flags().GetString("license-type")
+			return generateLicense(cwd, data, licenseType, dryRun, force)
+		case "dependabot":
+			return generateDependabot(cwd, data, dryRun, force)
+		case "sonarqube":
+			return generateSonarqube(cwd, data, dryRun, force)
+		case "sbom":
+			return generateSBOM(cwd, data, dryRun, force)
 		default:
-			fmt.Printf("Unknown generation type: %s\n", genType)
-			os.Exit(1)
+			return fmt.Errorf("unknown generation type: %s\n\nRun 'exo gen --help' for available types", genType)
 		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(genCmd)
-	genCmd.Flags().StringVarP(&appName, "name", "n", "myapp", "Name of the application")
-	genCmd.Flags().StringVarP(&lang, "lang", "l", "go", "Language of the application (go, node, python)")
-	genCmd.Flags().StringVarP(&provider, "provider", "p", "aws", "Cloud provider for infra generation (aws, gcp, azure)")
-	genCmd.Flags().String("db", "postgres", "Database type (postgres, mysql, mongo, redis)")
-	genCmd.Flags().String("monitoring", "none", "Monitoring stack (prometheus, none)")
-}
-
-func generateDockerfile(name string) {
-	// Current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Define paths (assuming templates are in a specific location relative to execution or embedded)
-	// For this phase, we'll assume the CLI is run from the project root for simplicity,
-	// or we can find the template relative to the source.
-	// In a real CLI, we would embed templates using //go:embed.
-	// Let's assume the user is running 'go run main.go' from the project root.
-	var templateFile string
-	switch lang {
-	case "node":
-		templateFile = "node.tmpl"
-	case "python":
-		templateFile = "python.tmpl"
-	case "go":
-		templateFile = "dockerfile.tmpl"
-	default:
-		fmt.Printf("Unsupported language: %s. Defaulting to Go.\n", lang)
-		templateFile = "dockerfile.tmpl"
-	}
-
-	templatePath := filepath.Join("templates", "docker", templateFile)
-	outputPath := filepath.Join(cwd, "Dockerfile")
-
-	data := struct {
-		AppName string
-	}{
-		AppName: name,
-	}
-
-	fmt.Printf("Generating Dockerfile for %s...\n", name)
-	if err := renderer.RenderTemplate(templatePath, outputPath, data); err != nil {
-		fmt.Printf("Error rendering template: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("Dockerfile generated successfully!")
-}
-
-func generateInfra(name string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Validate provider
-	validProviders := map[string]bool{"aws": true, "gcp": true, "azure": true}
-	if !validProviders[provider] {
-		fmt.Printf("Unsupported provider: %s. Supported providers: aws, gcp, azure\n", provider)
-		os.Exit(1)
-	}
-
-	infraDir := filepath.Join(cwd, "infra", provider)
-	templateDir := filepath.Join("templates", "terraform", provider)
-
-	files := []string{"main.tf", "variables.tf", "provider.tf"}
-	data := struct {
-		AppName string
-	}{
-		AppName: name,
-	}
-
-	fmt.Printf("Generating %s infrastructure for %s in %s...\n", provider, name, infraDir)
-
-	for _, file := range files {
-		templatePath := filepath.Join(templateDir, file+".tmpl")
-		outputPath := filepath.Join(infraDir, file)
-
-		if err := renderer.RenderTemplate(templatePath, outputPath, data); err != nil {
-			fmt.Printf("Error rendering %s: %v\n", file, err)
-			os.Exit(1)
-		}
-		fmt.Printf("Generated %s\n", file)
-	}
-
-	fmt.Printf("Infrastructure for %s generated successfully in infra/%s/\n", provider, provider)
-}
-
-func generateK8s(name string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	k8sDir := filepath.Join(cwd, "k8s")
-	files := []string{"deployment.yaml", "service.yaml", "ingress.yaml"}
-	data := struct{ AppName string }{AppName: name}
-
-	fmt.Printf("Generating Kubernetes manifests for %s...\n", name)
-	for _, file := range files {
-		tmplPath := filepath.Join("templates", "k8s", file+".tmpl")
-		outPath := filepath.Join(k8sDir, file)
-		if err := renderer.RenderTemplate(tmplPath, outPath, data); err != nil {
-			fmt.Printf("Error rendering %s: %v\n", file, err)
-			os.Exit(1)
-		}
-		fmt.Printf("Generated k8s/%s\n", file)
-	}
-	fmt.Println("Kubernetes manifests generated successfully in k8s/")
-}
-
-func generateCI() {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	ciDir := filepath.Join(cwd, ".github", "workflows")
-	templatePath := filepath.Join("templates", "ci", "github-actions.tmpl")
-	outputPath := filepath.Join(ciDir, "go.yml")
-
-	fmt.Println("Generating GitHub Actions workflow...")
-	if err := renderer.RenderTemplate(templatePath, outputPath, nil); err != nil {
-		fmt.Printf("Error rendering template: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("CI pipeline generated successfully at .github/workflows/go.yml")
-}
-
-func generateDB(name, db string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	tmplMap := map[string]string{
-		"postgres": "postgres.tmpl",
-		"mysql":    "mysql.tmpl",
-		"mongo":    "mongo.tmpl",
-		"redis":    "redis.tmpl",
-	}
-	tmplFile, ok := tmplMap[db]
-	if !ok {
-		fmt.Printf("Unknown database: %s (use postgres, mysql, mongo, redis)\n", db)
-		os.Exit(1)
-	}
-
-	data := struct{ AppName string }{AppName: name}
-	outPath := filepath.Join(cwd, fmt.Sprintf("docker-compose.%s.yml", db))
-	if err := renderer.RenderTemplate(filepath.Join("templates", "db", tmplFile), outPath, data); err != nil {
-		fmt.Printf("Error generating DB compose: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Database (%s) docker-compose generated → docker-compose.%s.yml\n", db, db)
-}
-
-func generateMakefile(name string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-	data := struct{ AppName string }{AppName: name}
-	outPath := filepath.Join(cwd, "Makefile")
-	if err := renderer.RenderTemplate(filepath.Join("templates", "makefile", "Makefile.tmpl"), outPath, data); err != nil {
-		fmt.Printf("Error generating Makefile: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Makefile generated → Makefile\n")
-}
-
-func generateEnv(name, db, prov, monitoring string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-	data := struct {
-		AppName    string
-		DB         string
-		Provider   string
-		Monitoring string
-	}{AppName: name, DB: db, Provider: prov, Monitoring: monitoring}
-	outPath := filepath.Join(cwd, ".env.example")
-	if err := renderer.RenderTemplate(filepath.Join("templates", "env", "env.tmpl"), outPath, data); err != nil {
-		fmt.Printf("Error generating .env.example: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf(".env.example generated → .env.example\n")
-}
-
-func generateHelm(name string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-	chartsDir := filepath.Join(cwd, "charts", name)
-	tmplDir := filepath.Join(cwd, "charts", name, "templates")
-	data := struct{ AppName string }{AppName: name}
-
-	files := []struct{ tmpl, out string }{
-		{filepath.Join("templates", "helm", "Chart.yaml.tmpl"), filepath.Join(chartsDir, "Chart.yaml")},
-		{filepath.Join("templates", "helm", "values.yaml.tmpl"), filepath.Join(chartsDir, "values.yaml")},
-		{filepath.Join("templates", "helm", "templates", "deployment.yaml.tmpl"), filepath.Join(tmplDir, "deployment.yaml")},
-		{filepath.Join("templates", "helm", "templates", "service.yaml.tmpl"), filepath.Join(tmplDir, "service.yaml")},
-		{filepath.Join("templates", "helm", "templates", "ingress.yaml.tmpl"), filepath.Join(tmplDir, "ingress.yaml")},
-	}
-	allOK := true
-	for _, f := range files {
-		if err := renderer.RenderTemplate(f.tmpl, f.out, data); err != nil {
-			fmt.Printf("Error generating %s: %v\n", f.out, err)
-			allOK = false
-		}
-	}
-	if allOK {
-		fmt.Printf("Helm chart generated → charts/%s/\n", name)
-	}
-}
-
-func generateGitignore(name, language, db string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-	data := struct {
-		AppName  string
-		Language string
-		DB       string
-	}{AppName: name, Language: language, DB: db}
-
-	outPath := filepath.Join(cwd, ".gitignore")
-	if err := renderer.RenderTemplate(filepath.Join("templates", "gitignore", "gitignore.tmpl"), outPath, data); err != nil {
-		fmt.Printf("Error generating .gitignore: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf(".gitignore generated → .gitignore\n")
-}
-
-func generateGrafana(name string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-	data := struct{ AppName string }{AppName: name}
-
-	outPath := filepath.Join(cwd, "grafana_dashboard.json")
-	if err := renderer.RenderTemplate(filepath.Join("templates", "grafana", "dashboard.json.tmpl"), outPath, data); err != nil {
-		fmt.Printf("Error generating Grafana dashboard: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Grafana dashboard generated → grafana_dashboard.json\n")
-}
-
-func generateAlerts(name string) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-	data := struct{ AppName string }{AppName: name}
-
-	outPath := filepath.Join(cwd, "alerts.yml")
-	if err := renderer.RenderTemplate(filepath.Join("templates", "alerts", "alerts.yml.tmpl"), outPath, data); err != nil {
-		fmt.Printf("Error generating alerts: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("Prometheus alerts generated → alerts.yml\n")
+	genCmd.Flags().StringP("name", "n", "", "Application name (defaults to .exo.yaml or directory name)")
+	genCmd.Flags().StringP("lang", "l", "", "Language override (go, node, python, java, rust)")
+	genCmd.Flags().StringP("provider", "p", "", "Cloud provider override (aws, gcp, azure)")
+	genCmd.Flags().String("db", "", "Database override (postgres, mysql, mongo, redis)")
+	genCmd.Flags().String("monitoring", "", "Monitoring override (prometheus, none)")
+	genCmd.Flags().Bool("dry-run", false, "Preview what would be generated without writing files")
+	genCmd.Flags().Bool("force", false, "Overwrite existing files without prompting")
+	genCmd.Flags().String("license-type", "mit", "License type for 'exo gen license' (mit, apache2, gpl3)")
+	genCmd.Flags().StringP("output-dir", "o", "", "Write generated files into this directory instead of the current directory")
 }

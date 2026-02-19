@@ -39,10 +39,13 @@ Available tools:
   infra        Terraform infrastructure for a cloud provider
   db           Database docker-compose`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		tool := args[0]
 		name := loadProjectName()
-		cwd, _ := os.Getwd()
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
 
 		fmt.Printf("Adding '%s' to project '%s'...\n\n", tool, name)
 
@@ -54,13 +57,13 @@ Available tools:
 		case "k8s":
 			addK8s(cwd, name)
 		case "infra":
-			addInfra(cwd, name, cmd)
+			return addInfra(cwd, name, cmd)
 		case "db":
-			addDB(cwd, name, cmd)
+			return addDB(cwd, name, cmd)
 		default:
-			fmt.Printf("Unknown tool: %s\n\nAvailable: monitoring, ci, k8s, infra, db\n", tool)
-			os.Exit(1)
+			return fmt.Errorf("unknown tool: %s\n\nAvailable: monitoring, ci, k8s, infra, db", tool)
 		}
+		return nil
 	},
 }
 
@@ -73,7 +76,7 @@ func addMonitoring(cwd, name string) {
 	data := struct{ AppName string }{AppName: name}
 	allOK := true
 	for outFile, tmplPath := range files {
-		if err := renderFile(tmplPath, filepath.Join(monDir, outFile), data); err != nil {
+		if err := renderFile(tmplPath, filepath.Join(monDir, outFile), data, false, false); err != nil {
 			addPrintErr(fmt.Sprintf("monitoring/%s: %v", outFile, err))
 			allOK = false
 		}
@@ -92,13 +95,13 @@ func addCI(cwd, name string, cmd *cobra.Command) {
 	switch ciTool {
 	case "github-actions":
 		ciDir := filepath.Join(cwd, ".github", "workflows")
-		if err := renderFile(filepath.Join("templates", "ci", "github-actions.tmpl"), filepath.Join(ciDir, "go.yml"), data); err != nil {
+		if err := renderFile(filepath.Join("templates", "ci", "github-actions.tmpl"), filepath.Join(ciDir, "go.yml"), data, false, false); err != nil {
 			addPrintErr(fmt.Sprintf("GitHub Actions: %v", err))
 		} else {
 			addPrintOK("GitHub Actions → .github/workflows/go.yml")
 		}
 	case "gitlab-ci":
-		if err := renderFile(filepath.Join("templates", "ci", "gitlab-ci.tmpl"), filepath.Join(cwd, ".gitlab-ci.yml"), data); err != nil {
+		if err := renderFile(filepath.Join("templates", "ci", "gitlab-ci.tmpl"), filepath.Join(cwd, ".gitlab-ci.yml"), data, false, false); err != nil {
 			addPrintErr(fmt.Sprintf("GitLab CI: %v", err))
 		} else {
 			addPrintOK("GitLab CI → .gitlab-ci.yml")
@@ -114,7 +117,7 @@ func addK8s(cwd, name string) {
 	files := []string{"deployment.yaml", "service.yaml", "ingress.yaml"}
 	allOK := true
 	for _, f := range files {
-		if err := renderFile(filepath.Join("templates", "k8s", f+".tmpl"), filepath.Join(k8sDir, f), data); err != nil {
+		if err := renderFile(filepath.Join("templates", "k8s", f+".tmpl"), filepath.Join(k8sDir, f), data, false, false); err != nil {
 			addPrintErr(fmt.Sprintf("k8s/%s: %v", f, err))
 			allOK = false
 		}
@@ -124,18 +127,17 @@ func addK8s(cwd, name string) {
 	}
 }
 
-func addInfra(cwd, name string, cmd *cobra.Command) {
+func addInfra(cwd, name string, cmd *cobra.Command) error {
 	p, _ := cmd.Flags().GetString("provider")
 	if p == "" {
-		addPrintErr("--provider flag required (aws, gcp, azure)")
-		os.Exit(1)
+		return fmt.Errorf("--provider flag required (aws, gcp, azure)")
 	}
 	infraDir := filepath.Join(cwd, "infra", p)
 	tmplDir := filepath.Join("templates", "terraform", p)
 	data := struct{ AppName string }{AppName: name}
 	allOK := true
 	for _, f := range []string{"main.tf", "variables.tf", "provider.tf"} {
-		if err := renderFile(filepath.Join(tmplDir, f+".tmpl"), filepath.Join(infraDir, f), data); err != nil {
+		if err := renderFile(filepath.Join(tmplDir, f+".tmpl"), filepath.Join(infraDir, f), data, false, false); err != nil {
 			addPrintErr(fmt.Sprintf("infra/%s/%s: %v", p, f, err))
 			allOK = false
 		}
@@ -143,13 +145,13 @@ func addInfra(cwd, name string, cmd *cobra.Command) {
 	if allOK {
 		addPrintOK(fmt.Sprintf("Terraform (%s) → infra/%s/", p, p))
 	}
+	return nil
 }
 
-func addDB(cwd, name string, cmd *cobra.Command) {
+func addDB(cwd, name string, cmd *cobra.Command) error {
 	db, _ := cmd.Flags().GetString("db")
 	if db == "" {
-		addPrintErr("--db flag required (postgres, mysql, mongo, redis)")
-		os.Exit(1)
+		return fmt.Errorf("--db flag required (postgres, mysql, mongo, redis)")
 	}
 	tmplMap := map[string]string{
 		"postgres": "postgres.tmpl",
@@ -159,16 +161,16 @@ func addDB(cwd, name string, cmd *cobra.Command) {
 	}
 	tmplFile, ok := tmplMap[db]
 	if !ok {
-		addPrintErr(fmt.Sprintf("Unknown database: %s (use postgres, mysql, mongo, redis)", db))
-		os.Exit(1)
+		return fmt.Errorf("unknown database: %s (use postgres, mysql, mongo, redis)", db)
 	}
 	data := struct{ AppName string }{AppName: name}
 	outPath := filepath.Join(cwd, fmt.Sprintf("docker-compose.%s.yml", db))
-	if err := renderFile(filepath.Join("templates", "db", tmplFile), outPath, data); err != nil {
+	if err := renderFile(filepath.Join("templates", "db", tmplFile), outPath, data, false, false); err != nil {
 		addPrintErr(fmt.Sprintf("db: %v", err))
 	} else {
 		addPrintOK(fmt.Sprintf("%s → docker-compose.%s.yml", db, db))
 	}
+	return nil
 }
 
 func init() {

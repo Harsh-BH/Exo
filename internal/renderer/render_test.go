@@ -92,3 +92,81 @@ func TestRenderTemplate_InvalidData(t *testing.T) {
 		t.Error("RenderTemplate() expected error for invalid template syntax, got nil")
 	}
 }
+
+// ─── RenderTemplateString ─────────────────────────────────────────────────────
+
+func TestRenderTemplateString(t *testing.T) {
+	tempDir := t.TempDir()
+	outPath := filepath.Join(tempDir, "output.txt")
+
+	data := struct{ Name string }{Name: "Exo"}
+	err := RenderTemplateString("Hello {{.Name}}!", outPath, data, false, false)
+	if err != nil {
+		t.Fatalf("RenderTemplateString() error = %v", err)
+	}
+
+	content, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("ReadFile error = %v", err)
+	}
+	if string(content) != "Hello Exo!" {
+		t.Errorf("output = %q, want %q", string(content), "Hello Exo!")
+	}
+}
+
+func TestRenderTemplateString_DryRun(t *testing.T) {
+	tempDir := t.TempDir()
+	outPath := filepath.Join(tempDir, "should-not-exist.txt")
+
+	err := RenderTemplateString("dry {{.V}}", outPath, map[string]string{"V": "run"}, true, false)
+	if err != nil {
+		t.Fatalf("RenderTemplateString() error = %v", err)
+	}
+	if _, statErr := os.Stat(outPath); statErr == nil {
+		t.Error("file should NOT be created in dry-run mode")
+	}
+}
+
+func TestRenderTemplateString_ForceOverwrite(t *testing.T) {
+	tempDir := t.TempDir()
+	outPath := filepath.Join(tempDir, "existing.txt")
+
+	// Pre-create file
+	os.WriteFile(outPath, []byte("old content"), 0644)
+
+	data := struct{ V string }{V: "new"}
+	// Without --force the file should be left alone
+	_ = RenderTemplateString("{{.V}}", outPath, data, false, false)
+	content, _ := os.ReadFile(outPath)
+	if string(content) != "old content" {
+		t.Errorf("without --force file should be unchanged, got %q", string(content))
+	}
+
+	// With --force the file should be overwritten
+	_ = RenderTemplateString("{{.V}}", outPath, data, false, true)
+	content, _ = os.ReadFile(outPath)
+	if string(content) != "new" {
+		t.Errorf("with --force file should be overwritten, got %q", string(content))
+	}
+}
+
+func TestRenderTemplateString_InvalidSyntax(t *testing.T) {
+	tempDir := t.TempDir()
+	err := RenderTemplateString("{{.Bad", filepath.Join(tempDir, "x.txt"), nil, false, false)
+	if err == nil {
+		t.Error("expected error for invalid template syntax")
+	}
+}
+
+func TestRenderTemplateString_CreatesSubdirs(t *testing.T) {
+	tempDir := t.TempDir()
+	outPath := filepath.Join(tempDir, "sub", "dir", "out.txt")
+
+	err := RenderTemplateString("hello", outPath, nil, false, false)
+	if err != nil {
+		t.Fatalf("RenderTemplateString() error = %v", err)
+	}
+	if _, statErr := os.Stat(outPath); statErr != nil {
+		t.Errorf("expected file at %s, got: %v", outPath, statErr)
+	}
+}

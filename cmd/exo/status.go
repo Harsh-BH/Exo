@@ -12,81 +12,171 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// statusEntry describes one tracked file / directory.
+type statusEntry struct {
+	label string
+	path  string // relative to cwd
+}
+
+// statusGroup is a named category shown as a tree section.
+type statusGroup struct {
+	title   string
+	entries []statusEntry
+}
+
+var statusGroups = []statusGroup{
+	{
+		title: "Containers",
+		entries: []statusEntry{
+			{"Dockerfile", "Dockerfile"},
+			{"docker-compose", "docker-compose.yml"},
+		},
+	},
+	{
+		title: "CI/CD",
+		entries: []statusEntry{
+			{"GitHub Actions", filepath.Join(".github", "workflows")},
+			{"GitLab CI", ".gitlab-ci.yml"},
+		},
+	},
+	{
+		title: "Kubernetes",
+		entries: []statusEntry{
+			{"Manifests", "k8s"},
+			{"Helm chart", "charts"},
+		},
+	},
+	{
+		title: "Infrastructure (Terraform)",
+		entries: []statusEntry{
+			{"AWS", filepath.Join("infra", "aws")},
+			{"GCP", filepath.Join("infra", "gcp")},
+			{"Azure", filepath.Join("infra", "azure")},
+		},
+	},
+	{
+		title: "Databases",
+		entries: []statusEntry{
+			{"PostgreSQL", "docker-compose.postgres.yml"},
+			{"MySQL", "docker-compose.mysql.yml"},
+			{"MongoDB", "docker-compose.mongo.yml"},
+			{"Redis", "docker-compose.redis.yml"},
+		},
+	},
+	{
+		title: "Monitoring",
+		entries: []statusEntry{
+			{"Prometheus / Grafana", "monitoring"},
+			{"Alert rules", "alerts.yml"},
+			{"Grafana dashboard", "grafana_dashboard.json"},
+		},
+	},
+	{
+		title: "Project files",
+		entries: []statusEntry{
+			{"Makefile", "Makefile"},
+			{".env.example", ".env.example"},
+			{".gitignore", ".gitignore"},
+			{"README", "README.md"},
+			{"LICENSE", "LICENSE"},
+			{"EXO config", ".exo.yaml"},
+		},
+	},
+}
+
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show what EXO has generated in this project",
-	Long:  `Displays a detailed report of all EXO-generated assets including file sizes and modification times.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Long:  `Displays a detailed tree report of all EXO-generated assets, grouped by category.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		showDiff, _ := cmd.Flags().GetBool("diff")
 
-		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("82")).Bold(true)
-		missingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+		// ── Styles ─────────────────────────────────────────────────────────────
+		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+		groupStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+		presentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("82")).Bold(true)
+		absentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+		labelPresentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 		metaStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Italic(true)
 		diffStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 
-		fmt.Println(titleStyle.Render("EXO Project Status"))
+		fmt.Println(headerStyle.Render("EXO Project Status"))
 		fmt.Println()
 
-		checks := []struct {
-			label string
-			path  string
-		}{
-			{"Dockerfile", "Dockerfile"},
-			{"Terraform (AWS)", filepath.Join("infra", "aws")},
-			{"Terraform (GCP)", filepath.Join("infra", "gcp")},
-			{"Terraform (Azure)", filepath.Join("infra", "azure")},
-			{"GitHub Actions", filepath.Join(".github", "workflows")},
-			{"GitLab CI", ".gitlab-ci.yml"},
-			{"Monitoring", "monitoring"},
-			{"K8s Manifests", "k8s"},
-			{"DB (PostgreSQL)", "docker-compose.postgres.yml"},
-			{"DB (MySQL)", "docker-compose.mysql.yml"},
-			{"DB (MongoDB)", "docker-compose.mongo.yml"},
-			{"DB (Redis)", "docker-compose.redis.yml"},
-			{"Makefile", "Makefile"},
-			{"Env Example", ".env.example"},
-			{"Helm Chart", filepath.Join("charts")},
-			{"EXO Config", ".exo.yaml"},
-		}
+		totalPresent := 0
+		totalChecked := 0
 
-		for _, c := range checks {
-			fullPath := filepath.Join(cwd, c.path)
-			info, err := os.Stat(fullPath)
-			if err == nil {
-				meta := formatMeta(info)
-				fmt.Printf("  %s  %-28s %s\n",
-					okStyle.Render("✓"),
-					c.label,
-					metaStyle.Render(meta),
-				)
-				if showDiff {
-					printDiffPreview(fullPath, info, diffStyle)
+		for _, grp := range statusGroups {
+			// Count how many are present in this group
+			presentCount := 0
+			for _, e := range grp.entries {
+				if _, err := os.Stat(filepath.Join(cwd, e.path)); err == nil {
+					presentCount++
 				}
-			} else {
-				fmt.Printf("  %s  %s\n",
-					missingStyle.Render("○"),
-					missingStyle.Render(c.label),
-				)
 			}
+			if presentCount == 0 {
+				// skip entirely empty groups unless verbose
+				continue
+			}
+
+			fmt.Printf("  %s\n", groupStyle.Render(grp.title))
+
+			last := len(grp.entries) - 1
+			for i, e := range grp.entries {
+				totalChecked++
+				connector := "├──"
+				if i == last {
+					connector = "└──"
+				}
+
+				fullPath := filepath.Join(cwd, e.path)
+				info, statErr := os.Stat(fullPath)
+				if statErr == nil {
+					totalPresent++
+					meta := formatMeta(info)
+					fmt.Printf("  %s %s  %-24s  %s\n",
+						connector,
+						presentStyle.Render("✓"),
+						labelPresentStyle.Render(e.label),
+						metaStyle.Render(meta),
+					)
+					if showDiff {
+						printDiffPreview(fullPath, info, diffStyle)
+					}
+				} else {
+					fmt.Printf("  %s %s  %s\n",
+						connector,
+						absentStyle.Render("○"),
+						absentStyle.Render(e.label),
+					)
+				}
+			}
+			fmt.Println()
 		}
 
-		fmt.Println()
+		// ── Summary bar ────────────────────────────────────────────────────────
+		summaryStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+		fmt.Printf("  %s\n\n", summaryStyle.Render(
+			fmt.Sprintf("%d / %d assets present", totalPresent, totalChecked),
+		))
+
+		// ── Config block ───────────────────────────────────────────────────────
 		if config.Exists(cwd) {
 			cfg, _ := config.Load(cwd)
-			fmt.Println(titleStyle.Render("Config (.exo.yaml)"))
+			fmt.Println(headerStyle.Render("Config (.exo.yaml)"))
 			fmt.Printf("  Name:       %s\n", cfg.Name)
 			fmt.Printf("  Language:   %s\n", cfg.Language)
 			fmt.Printf("  Provider:   %s\n", cfg.Provider)
 			fmt.Printf("  CI/CD:      %s\n", cfg.CI)
 			fmt.Printf("  Monitoring: %s\n", cfg.Monitoring)
+			fmt.Println()
 		}
+		return nil
 	},
 }
 
@@ -96,9 +186,9 @@ func formatMeta(info os.FileInfo) string {
 	ageStr := formatAge(age)
 
 	if info.IsDir() {
-		return fmt.Sprintf("dir  •  modified %s", ageStr)
+		return fmt.Sprintf("dir  •  %s", ageStr)
 	}
-	return fmt.Sprintf("%s  •  modified %s", formatSize(info.Size()), ageStr)
+	return fmt.Sprintf("%s  •  %s", formatSize(info.Size()), ageStr)
 }
 
 func formatSize(bytes int64) string {

@@ -60,44 +60,37 @@ var pluginAddCmd = &cobra.Command{
 	Use:   "add <url>",
 	Short: "Install a plugin from a Git URL",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		url := args[0]
 		infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("82")).Bold(true)
-		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 
-		// Derive plugin name from URL
 		name := pluginNameFromURL(url)
 		destDir := filepath.Join(exoPluginsDir(), name)
 
 		if _, err := os.Stat(destDir); err == nil {
-			fmt.Printf("  %s  Plugin '%s' is already installed. Use 'exo plugin remove %s' first.\n",
-				errStyle.Render("✗"), name, name)
-			os.Exit(1)
+			return fmt.Errorf("plugin '%s' is already installed — use 'exo plugin remove %s' first", name, name)
 		}
-
 		if !toolExists("git") {
-			fmt.Printf("  %s  git is required to install plugins.\n", errStyle.Render("✗"))
-			os.Exit(1)
+			return fmt.Errorf("git is required to install plugins")
 		}
 
 		fmt.Printf("%s Installing plugin '%s' from %s...\n", infoStyle.Render("→"), name, url)
 
 		if err := os.MkdirAll(exoPluginsDir(), 0755); err != nil {
-			fmt.Printf("  %s  Failed to create plugins dir: %v\n", errStyle.Render("✗"), err)
-			os.Exit(1)
+			return fmt.Errorf("creating plugins dir: %w", err)
 		}
 
 		gitCmd := exec.Command("git", "clone", "--depth=1", url, destDir)
 		gitCmd.Stdout = os.Stdout
 		gitCmd.Stderr = os.Stderr
 		if err := gitCmd.Run(); err != nil {
-			fmt.Printf("  %s  Clone failed: %v\n", errStyle.Render("✗"), err)
-			os.Exit(1)
+			return fmt.Errorf("clone failed: %w", err)
 		}
 
 		fmt.Printf("  %s  Plugin '%s' installed → %s\n", okStyle.Render("✓"), name, destDir)
 		fmt.Printf("  Use: exo gen %s --name=myapp\n", name)
+		return nil
 	},
 }
 
@@ -105,22 +98,19 @@ var pluginRemoveCmd = &cobra.Command{
 	Use:   "remove <name>",
 	Short: "Remove an installed plugin",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("82")).Bold(true)
-		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 
 		destDir := filepath.Join(exoPluginsDir(), name)
 		if _, err := os.Stat(destDir); err != nil {
-			fmt.Printf("  %s  Plugin '%s' is not installed.\n", errStyle.Render("✗"), name)
-			os.Exit(1)
+			return fmt.Errorf("plugin '%s' is not installed", name)
 		}
-
 		if err := os.RemoveAll(destDir); err != nil {
-			fmt.Printf("  %s  Failed to remove plugin: %v\n", errStyle.Render("✗"), err)
-			os.Exit(1)
+			return fmt.Errorf("removing plugin: %w", err)
 		}
 		fmt.Printf("  %s  Plugin '%s' removed.\n", okStyle.Render("✓"), name)
+		return nil
 	},
 }
 

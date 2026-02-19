@@ -2,8 +2,9 @@ stages:
   - build
   - test
 
+{{- if eq .Language "go"}}
 variables:
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.22"
 
 build:
   stage: build
@@ -15,4 +16,95 @@ test:
   stage: test
   image: golang:${GO_VERSION}-alpine
   script:
-    - go test -v ./...
+    - go test -v -race -coverprofile=coverage.out ./...
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.out
+
+{{- else if eq .Language "node"}}
+variables:
+  NODE_VERSION: "20"
+
+build:
+  stage: build
+  image: node:${NODE_VERSION}-alpine
+  script:
+    - npm ci
+    - npm run build --if-present
+  cache:
+    paths:
+      - node_modules/
+
+test:
+  stage: test
+  image: node:${NODE_VERSION}-alpine
+  script:
+    - npm test -- --coverage --watchAll=false
+  cache:
+    paths:
+      - node_modules/
+
+{{- else if eq .Language "python"}}
+variables:
+  PYTHON_VERSION: "3.12"
+
+build:
+  stage: build
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pip install -r requirements.txt
+
+test:
+  stage: test
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - pip install -r requirements.txt pytest pytest-cov
+    - pytest --cov=. --cov-report=xml
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
+{{- else if eq .Language "java"}}
+build:
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  script:
+    - mvn --no-transfer-progress package -DskipTests
+  artifacts:
+    paths:
+      - target/*.jar
+
+test:
+  stage: test
+  image: maven:3.9-eclipse-temurin-21
+  script:
+    - mvn --no-transfer-progress verify
+
+{{- else if eq .Language "rust"}}
+build:
+  stage: build
+  image: rust:latest
+  script:
+    - cargo build --verbose
+
+test:
+  stage: test
+  image: rust:latest
+  script:
+    - cargo test --verbose
+
+{{- else}}
+build:
+  stage: build
+  script:
+    - echo "Configure build steps for {{.Language}}"
+
+test:
+  stage: test
+  script:
+    - echo "Configure test steps for {{.Language}}"
+{{- end}}

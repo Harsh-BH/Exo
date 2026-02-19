@@ -3,9 +3,11 @@ package exo
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/Harsh-BH/Exo/internal/config"
+	"github.com/Harsh-BH/Exo/internal/detector"
 	"github.com/Harsh-BH/Exo/internal/prompt"
 	"github.com/Harsh-BH/Exo/internal/renderer"
 	"github.com/charmbracelet/lipgloss"
@@ -24,11 +26,30 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize the project with an interactive wizard",
 	Long:  `Launches an interactive wizard to configure and generate all DevOps assets for your project.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Printf("Error getting current directory: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("could not get working directory: %w", err)
+		}
+
+		// ── --from-git: clone repo then re-use wizard ──────────────────────────
+		if fromGit, _ := cmd.Flags().GetString("from-git"); fromGit != "" {
+			fmt.Printf("Cloning %s …\n", fromGit)
+			cloneCmd := exec.Command("git", "clone", "--depth=1", fromGit, ".")
+			cloneCmd.Dir = cwd
+			cloneCmd.Stdout = os.Stdout
+			cloneCmd.Stderr = os.Stderr
+			if err := cloneCmd.Run(); err != nil {
+				return fmt.Errorf("git clone failed: %w", err)
+			}
+			// Auto-detect language/framework from the cloned repo so the wizard
+			// starts with sensible defaults.
+			if info, detErr := detector.Detect(cwd); detErr == nil {
+				if !cmd.Flags().Changed("lang") {
+					_ = cmd.Flags().Set("lang", info.Language)
+				}
+			}
+			fmt.Println()
 		}
 
 		// Check for non-interactive mode
@@ -37,11 +58,9 @@ var initCmd = &cobra.Command{
 		var projectData *prompt.ProjectData
 
 		if nonInteractive {
-			// Read all flags directly
 			name, _ := cmd.Flags().GetString("name")
 			if name == "" {
-				fmt.Println("Error: --name is required in non-interactive mode")
-				os.Exit(1)
+				return fmt.Errorf("--name is required in non-interactive mode")
 			}
 			langFlag, _ := cmd.Flags().GetString("lang")
 			providerFlag, _ := cmd.Flags().GetString("provider")
@@ -58,20 +77,25 @@ var initCmd = &cobra.Command{
 			}
 			fmt.Printf("Running in non-interactive mode for project '%s'...\n", name)
 		} else {
-			// Run the interactive wizard
-			var err error
 			projectData, err = prompt.Run()
 			if err != nil {
+				// User cancelled — not a hard error
 				fmt.Printf("\n%v\n", err)
-				os.Exit(0)
+				return nil
 			}
 		}
 
 		fmt.Printf("\nGenerating assets for '%s'...\n\n", projectData.Name)
 
-		data := struct {
-			AppName string
-		}{AppName: projectData.Name}
+		data := config.TemplateData{
+			AppName:    projectData.Name,
+			Language:   projectData.Language,
+			Provider:   projectData.Provider,
+			CI:         projectData.CI,
+			Monitoring: projectData.Monitoring,
+			DB:         projectData.DB,
+			Port:       8080,
+		}
 
 		// ── 1. Dockerfile ──────────────────────────────────────────────────────
 		dockerTemplateMap := map[string]string{
@@ -178,6 +202,8 @@ var initCmd = &cobra.Command{
 			Provider:   projectData.Provider,
 			CI:         projectData.CI,
 			Monitoring: projectData.Monitoring,
+			DB:         projectData.DB,
+			Port:       8080,
 		}
 		if err := config.Save(cwd, cfg); err != nil {
 			printErr(fmt.Sprintf(".exo.yaml: %v", err))
@@ -187,6 +213,7 @@ var initCmd = &cobra.Command{
 
 		fmt.Printf("\nAll done! Your project '%s' is ready. Run 'exo status' to see what was generated.\n", projectData.Name)
 		RecordHistory("exo init", projectData.Name, fmt.Sprintf("lang=%s provider=%s ci=%s", projectData.Language, projectData.Provider, projectData.CI))
+		return nil
 	},
 }
 
@@ -199,4 +226,5 @@ func init() {
 	initCmd.Flags().String("ci", "none", "CI/CD tool (github-actions, gitlab-ci, none)")
 	initCmd.Flags().String("monitoring", "none", "Monitoring stack (prometheus, none)")
 	initCmd.Flags().String("db", "none", "Database (postgres, mysql, mongo, redis, none)")
+	initCmd.Flags().String("from-git", "", "Clone a remote git repository before running the wizard (e.g. https://github.com/org/repo)")
 }

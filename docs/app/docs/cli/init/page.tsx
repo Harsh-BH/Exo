@@ -42,11 +42,12 @@ export default function CLIInitPage() {
           <tbody>
             <tr><td><code>--non-interactive</code></td><td>bool</td><td>Skip the wizard, use flags for config</td></tr>
             <tr><td><code>--name</code></td><td>string</td><td>Project name</td></tr>
-            <tr><td><code>--lang</code></td><td>string</td><td>Language: go, node, python</td></tr>
+            <tr><td><code>--lang</code></td><td>string</td><td>Language: go, node, python, java, rust</td></tr>
             <tr><td><code>--provider</code></td><td>string</td><td>Cloud: aws, gcp, azure, none</td></tr>
             <tr><td><code>--ci</code></td><td>string</td><td>CI: github-actions, gitlab-ci, none</td></tr>
             <tr><td><code>--monitoring</code></td><td>string</td><td>Monitoring: prometheus, none</td></tr>
             <tr><td><code>--db</code></td><td>string</td><td>Database: postgres, mysql, mongo, redis, none</td></tr>
+            <tr><td><code>--from-git</code></td><td>string</td><td>Clone a git URL and auto-detect + scaffold the cloned repo</td></tr>
           </tbody>
         </table>
       </section>
@@ -69,6 +70,15 @@ export default function CLIInitPage() {
   --ci=github-actions \\
   --monitoring=prometheus \\
   --db=postgres`} />
+          </div>
+          <div>
+            <p className="text-arch-text-bright text-sm font-semibold mb-2">Bootstrap from an existing git repository</p>
+            <CodeBlock language="bash" code={`# Clone repo, auto-detect stack, launch wizard pre-filled
+exo init --from-git https://github.com/org/my-service
+
+# Fully non-interactive from git
+exo init --from-git https://github.com/org/my-service \\
+  --non-interactive --name=my-service --provider=aws`} />
           </div>
         </div>
       </section>

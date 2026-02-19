@@ -18,12 +18,13 @@ var validateCmd = &cobra.Command{
 Available targets:
   infra    Run terraform fmt -check and terraform validate
   k8s      Run kubectl apply --dry-run=client on k8s/ manifests
-  docker   Run docker build --check on Dockerfile
+  docker   Run docker build --check on Dockerfile (--security runs Trivy)
   all      Run all validations`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		target := args[0]
 		cwd, _ := os.Getwd()
+		security, _ := cmd.Flags().GetBool("security")
 
 		switch target {
 		case "infra":
@@ -31,15 +32,15 @@ Available targets:
 		case "k8s":
 			validateK8s(cwd)
 		case "docker":
-			validateDocker(cwd)
+			validateDocker(cwd, security)
 		case "all":
 			validateInfra(cwd)
 			validateK8s(cwd)
-			validateDocker(cwd)
+			validateDocker(cwd, security)
 		default:
-			fmt.Printf("Unknown target: %s\n\nAvailable: infra, k8s, docker, all\n", target)
-			os.Exit(1)
+			return fmt.Errorf("unknown target: %s\n\nAvailable: infra, k8s, docker, all", target)
 		}
+		return nil
 	},
 }
 
@@ -135,7 +136,7 @@ func validateK8s(cwd string) {
 	}
 }
 
-func validateDocker(cwd string) {
+func validateDocker(cwd string, security bool) {
 	fmt.Println(valHdrStyle.Render("\n── Dockerfile Validation ──"))
 
 	dockerfilePath := filepath.Join(cwd, "Dockerfile")
@@ -166,8 +167,35 @@ func validateDocker(cwd string) {
 	} else {
 		valOK("Dockerfile passed docker build --check")
 	}
+
+	// ── Trivy security scan ────────────────────────────────────────────────
+	if security {
+		fmt.Println(valHdrStyle.Render("\n── Trivy Security Scan ──"))
+		if !toolExists("trivy") {
+			valWarn("trivy not found — install from https://trivy.dev/\n     Hint: brew install trivy  |  apt install trivy")
+			return
+		}
+		// Build the image first so trivy can scan it
+		imageName := "exo-trivy-scan:latest"
+		if _, err := runCheck("docker", "build", "-t", imageName, "-f", dockerfilePath, cwd); err != nil {
+			valWarn("Could not build image for Trivy scan — run 'docker build' manually first")
+			return
+		}
+		out, err := runCheck("trivy", "image", "--exit-code", "0", "--severity", "HIGH,CRITICAL", imageName)
+		if err != nil {
+			valErr(fmt.Sprintf("Trivy found HIGH/CRITICAL vulnerabilities:\n%s", out))
+		} else {
+			valOK("Trivy: no HIGH/CRITICAL vulnerabilities found")
+			if out != "" {
+				fmt.Printf("     %s\n", lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Render(out))
+			}
+		}
+		// Clean up temp image
+		runCheck("docker", "rmi", "-f", imageName) //nolint:errcheck
+	}
 }
 
 func init() {
 	rootCmd.AddCommand(validateCmd)
+	validateCmd.Flags().Bool("security", false, "Run Trivy image security scan (requires trivy + docker)")
 }

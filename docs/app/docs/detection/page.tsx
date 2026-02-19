@@ -21,8 +21,8 @@ export default function DetectionPage() {
           directory for known marker files and returns a <code className="text-arch-pink">StackInfo</code> struct.
         </p>
         <CodeBlock language="go" filename="internal/detector/detect.go" showLineNumbers code={`type StackInfo struct {
-    Language  string   // "go", "node", "python", "unknown"
-    Framework string   // "gin", "express", "flask", etc.
+    Language  string   // "go", "node", "python", "java", "rust", "unknown"
+    Framework string   // "gin", "express", "flask", "spring", etc.
     Files     []string // Marker files found
 }`} />
       </section>
@@ -45,7 +45,7 @@ export default function DetectionPage() {
             <tr>
               <td><code>package.json</code></td>
               <td><span className="badge-green">Node.js</span></td>
-              <td>Checks deps for <code>express</code>, <code>react</code>, <code>next</code>, <code>fastify</code></td>
+              <td>Checks deps for <code>express</code>, <code>react</code>, <code>next</code>, <code>fastify</code>, <code>koa</code>, <code>nest</code></td>
             </tr>
             <tr>
               <td><code>requirements.txt</code></td>
@@ -61,6 +61,26 @@ export default function DetectionPage() {
               <td><code>setup.py</code></td>
               <td><span className="badge-purple">Python</span></td>
               <td>Same framework detection as requirements.txt</td>
+            </tr>
+            <tr>
+              <td><code>pyproject.toml</code></td>
+              <td><span className="badge-purple">Python</span></td>
+              <td>Same framework detection as requirements.txt</td>
+            </tr>
+            <tr>
+              <td><code>pom.xml</code></td>
+              <td><span className="badge-yellow">Java</span></td>
+              <td>Checks for <code>spring-boot</code>, <code>quarkus</code>, <code>micronaut</code></td>
+            </tr>
+            <tr>
+              <td><code>build.gradle</code></td>
+              <td><span className="badge-yellow">Java</span></td>
+              <td>Checks for spring, quarkus, micronaut</td>
+            </tr>
+            <tr>
+              <td><code>Cargo.toml</code></td>
+              <td><span className="badge-orange">Rust</span></td>
+              <td>Checks for <code>actix-web</code>, <code>axum</code>, <code>rocket</code>, <code>warp</code></td>
             </tr>
             <tr>
               <td><em>None found</em></td>
@@ -85,16 +105,25 @@ export default function DetectionPage() {
            │
      ┌─────▼─────┐      ┌─────────────────────┐
      │ go.mod ?  ├─Yes──▸│ Language: Go        │
-     └─────┬─────┘      │ Scan go.mod imports │
+     └─────┬─────┘      │ Scan go.mod imports  │
            │No           └─────────────────────┘
      ┌─────▼─────────┐  ┌─────────────────────┐
-     │ package.json ?├─Yes─▸│ Language: Node    │
+     │ package.json ?├─Yes─▸│ Language: Node  │
      └─────┬─────────┘  │ Scan dependencies    │
            │No           └─────────────────────┘
      ┌─────▼───────────────┐  ┌────────────────┐
      │ requirements.txt /  ├─Yes─▸│ Language:  │
-     │ Pipfile / setup.py  │  │ Python         │
-     └─────┬───────────────┘  └────────────────┘
+     │ Pipfile / setup.py /│  │ Python         │
+     │ pyproject.toml      │  └────────────────┘
+     └─────┬───────────────┘
+           │No
+     ┌─────▼──────────────────┐  ┌─────────────┐
+     │ pom.xml / build.gradle?├─Yes─▸│ Java    │
+     └─────┬──────────────────┘  └─────────────┘
+           │No
+     ┌─────▼─────────┐  ┌──────────────────────┐
+     │ Cargo.toml ?  ├─Yes─▸│ Language: Rust  │
+     └─────┬─────────┘  └──────────────────────┘
            │No
      ┌─────▼─────────┐
      │ Language:      │
@@ -112,19 +141,11 @@ export default function DetectionPage() {
           When <code className="text-arch-pink">go.mod</code> is found, Exo reads its contents and
           checks for known framework import paths:
         </p>
-        <CodeBlock language="go" showLineNumbers code={`func detectGoFramework(goModContent string) string {
-    frameworks := map[string]string{
-        "github.com/gin-gonic/gin":   "gin",
-        "github.com/labstack/echo":   "echo",
-        "github.com/gofiber/fiber":   "fiber",
-        "github.com/go-chi/chi":      "chi",
-    }
-    for path, name := range frameworks {
-        if strings.Contains(goModContent, path) {
-            return name
-        }
-    }
-    return ""
+        <CodeBlock language="go" showLineNumbers code={`frameworks := map[string]string{
+    "github.com/gin-gonic/gin":   "gin",
+    "github.com/labstack/echo":   "echo",
+    "github.com/gofiber/fiber":   "fiber",
+    "github.com/go-chi/chi":      "chi",
 }`} />
       </section>
 
@@ -136,14 +157,12 @@ export default function DetectionPage() {
         <p className="text-sm text-arch-text mb-4">
           When <code className="text-arch-pink">package.json</code> is found, dependencies are checked:
         </p>
-        <CodeBlock language="go" showLineNumbers code={`func detectNodeFramework(packageJSON string) string {
-    frameworks := []string{"express", "react", "next", "fastify", "koa", "nest"}
-    for _, fw := range frameworks {
-        if strings.Contains(packageJSON, \`"\`+fw+\`"\`) {
-            return fw
-        }
+        <CodeBlock language="go" showLineNumbers code={`// Detected: express, react, next, fastify, koa, nest
+frameworks := []string{"express", "react", "next", "fastify", "koa", "nest"}
+for _, fw := range frameworks {
+    if strings.Contains(packageJSON, fw) {
+        return fw
     }
-    return ""
 }`} />
       </section>
 
@@ -155,15 +174,47 @@ export default function DetectionPage() {
         <p className="text-sm text-arch-text mb-4">
           When any Python marker is found, the requirements file is checked:
         </p>
-        <CodeBlock language="go" showLineNumbers code={`func detectPythonFramework(requirementsContent string) string {
-    frameworks := []string{"flask", "django", "fastapi"}
-    lower := strings.ToLower(requirementsContent)
-    for _, fw := range frameworks {
-        if strings.Contains(lower, fw) {
-            return fw
-        }
+        <CodeBlock language="go" showLineNumbers code={`// Detected: flask, django, fastapi
+frameworks := []string{"flask", "django", "fastapi"}
+lower := strings.ToLower(requirementsContent)
+for _, fw := range frameworks {
+    if strings.Contains(lower, fw) {
+        return fw
     }
-    return ""
+}`} />
+      </section>
+
+      {/* Java Framework Detection */}
+      <section className="mb-10">
+        <h2 className="text-xl font-bold text-arch-text-bright mb-4">
+          <span className="text-arch-green mr-2">##</span> Java Framework Detection
+        </h2>
+        <p className="text-sm text-arch-text mb-4">
+          When <code className="text-arch-pink">pom.xml</code> or <code className="text-arch-pink">build.gradle</code> is found:
+        </p>
+        <CodeBlock language="go" showLineNumbers code={`// Detected: spring-boot (spring), quarkus, micronaut
+javaFrameworks := []string{"spring-boot", "spring", "quarkus", "micronaut"}
+for _, fw := range javaFrameworks {
+    if strings.Contains(lower, fw) {
+        return fw
+    }
+}`} />
+      </section>
+
+      {/* Rust Framework Detection */}
+      <section className="mb-10">
+        <h2 className="text-xl font-bold text-arch-text-bright mb-4">
+          <span className="text-arch-green mr-2">##</span> Rust Framework Detection
+        </h2>
+        <p className="text-sm text-arch-text mb-4">
+          When <code className="text-arch-pink">Cargo.toml</code> is found:
+        </p>
+        <CodeBlock language="go" showLineNumbers code={`// Detected: actix-web, axum, rocket, warp
+rustFrameworks := []string{"actix-web", "axum", "rocket", "warp"}
+for _, fw := range rustFrameworks {
+    if strings.Contains(lower, fw) {
+        return fw
+    }
 }`} />
       </section>
 

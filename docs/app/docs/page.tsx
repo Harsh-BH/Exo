@@ -55,7 +55,7 @@ $ exo init
             </tr>
           </thead>
           <tbody>
-            <tr><td className="text-arch-cyan font-semibold">Smart Stack Detection</td><td>Auto-detects Go, Node.js, Python projects from source files</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Smart Stack Detection</td><td>Auto-detects Go, Node.js, Python, Java, Rust from source files</td></tr>
             <tr><td className="text-arch-cyan font-semibold">Multi-Stage Dockerfiles</td><td>Generates optimized, language-specific Dockerfiles</td></tr>
             <tr><td className="text-arch-cyan font-semibold">Multi-Cloud Terraform</td><td>Scaffolds IaC modules for AWS, GCP, and Azure</td></tr>
             <tr><td className="text-arch-cyan font-semibold">CI/CD Pipelines</td><td>Generates GitHub Actions and GitLab CI workflows</td></tr>
@@ -66,8 +66,17 @@ $ exo init
             <tr><td className="text-arch-cyan font-semibold">Interactive Wizard</td><td>Guided setup via beautiful Bubble Tea terminal UI</td></tr>
             <tr><td className="text-arch-cyan font-semibold">Config Persistence</td><td>Saves config in .exo.yaml for repeatable runs</td></tr>
             <tr><td className="text-arch-cyan font-semibold">Plugin System</td><td>Community plugins and remote template registries</td></tr>
-            <tr><td className="text-arch-cyan font-semibold">Secret Scanner</td><td>Scans for hardcoded secrets, API keys, tokens</td></tr>
-            <tr><td className="text-arch-cyan font-semibold">Cross-Platform</td><td>Pre-built binaries for Linux, macOS (Intel & ARM), Windows</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Secret Scanner</td><td>Magic-byte binary skip + tightened allowlist (never suppresses password/secret)</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Security Validation</td><td><code>exo validate --security</code> runs Trivy on generated Dockerfiles</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">SBOM Generation</td><td><code>exo gen sbom</code> — CycloneDX JSON, uses syft if installed</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Diff Preview</td><td><code>exo diff</code> shows a unified diff before you overwrite files</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Clean Command</td><td><code>exo clean</code> removes all generated assets in one step</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Git Bootstrap</td><td><code>exo init --from-git &lt;url&gt;</code> clones and auto-scaffolds any repo</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Output Dir</td><td><code>--output-dir</code> writes generated files to a custom directory</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Dry Run</td><td><code>--dry-run</code> previews file list without writing anything</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Braille Spinner</td><td>Animated progress indicator during long-running generation</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Extended Detection</td><td>Java (pom.xml / build.gradle), Rust (Cargo.toml), 10+ frameworks</td></tr>
+            <tr><td className="text-arch-cyan font-semibold">Cross-Platform</td><td>Pre-built binaries for Linux, macOS (Intel &amp; ARM), Windows</td></tr>
           </tbody>
         </table>
       </section>

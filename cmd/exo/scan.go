@@ -2,7 +2,9 @@ package exo
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,10 +31,27 @@ var secretPatterns = []struct {
 }
 
 // safeValues are values that are obviously placeholders — skip them.
+// NOTE: "secret" and "password" are intentionally NOT here so they are caught.
 var safeValues = []string{
-	"change-me", "your-", "placeholder", "example", "secret",
-	"password", "changeme", "PLACEHOLDER", "TODO", "FIXME",
-	"${", "$(", "admin", "none",
+	"change-me", "your-", "placeholder", "example",
+	"changeme", "PLACEHOLDER", "TODO", "FIXME",
+	"${", "$(", "none",
+}
+
+// isBinaryFile returns true if the first 512 bytes of the file contain a null
+// byte — a reliable heuristic for binary content.
+func isBinaryFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	buf := make([]byte, 512)
+	n, err := io.ReadAtLeast(f, buf, 1)
+	if err != nil {
+		return false
+	}
+	return bytes.IndexByte(buf[:n], 0) != -1
 }
 
 var scanCmd = &cobra.Command{
@@ -69,12 +88,6 @@ var scanCmd = &cobra.Command{
 			".git": true, "node_modules": true, "vendor": true,
 			".exo": true, "bin": true, "dist": true,
 		}
-		// Skip binary-ish extensions
-		skipExts := map[string]bool{
-			".png": true, ".jpg": true, ".gif": true, ".pdf": true,
-			".zip": true, ".tar": true, ".gz": true, ".exe": true,
-			".so": true, ".dylib": true, ".wasm": true,
-		}
 
 		_ = filepath.WalkDir(cwd, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
@@ -86,7 +99,8 @@ var scanCmd = &cobra.Command{
 				}
 				return nil
 			}
-			if skipExts[strings.ToLower(filepath.Ext(d.Name()))] {
+			// Skip binary files detected by magic bytes
+			if isBinaryFile(path) {
 				return nil
 			}
 
